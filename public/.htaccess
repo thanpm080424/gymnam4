@@ -1,0 +1,10 @@
+Options -Indexes
+RewriteEngine On
+
+# Cho phép file tĩnh (css, js, ảnh, uploads)
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Tất cả request khác -> index.php
+RewriteRule ^(.*)$ index.php [QSA,L]

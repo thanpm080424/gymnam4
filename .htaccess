@@ -1,0 +1,6 @@
+Options -Indexes
+RewriteEngine On
+
+# Redirect root folder -> public/index.php
+RewriteCond %{REQUEST_URI} !^(.+)/public/
+RewriteRule ^(.*)$ public/index.php [QSA,L]

@@ -1,0 +1,12 @@
+-- Migration: Add Plan Check-in Table
+USE monkey_gym;
+
+CREATE TABLE IF NOT EXISTS PLAN_CHECKIN (
+    ma_checkin INT AUTO_INCREMENT PRIMARY KEY,
+    ma_plan INT NOT NULL,
+    week TINYINT NOT NULL COMMENT '1, 2, 3, 4',
+    day_name VARCHAR(50) NOT NULL COMMENT 'Thứ 2, Thứ 3...',
+    slot VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ma_plan) REFERENCES PLAN_CA_NHAN(ma_plan) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
