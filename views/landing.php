@@ -1,577 +1,367 @@
+<?php
+// views/landing.php
+?>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monkey Gym - Vuot Qua Gioi Han, Kien Tao Ban Than</title>
-    <meta name="description" content="Monkey Gym - Phong tap hien dai voi doi ngu HLV chuyen nghiep, he thong quan ly thong minh va cong dong hoi vien nang dong.">
-    <link rel="icon" type="image/png" href="<?= ASSET_URL ?>/favicon.png?v=2">
-    <link rel="stylesheet" href="<?= ASSET_URL ?>/css/styles.css">
-    <link rel="stylesheet" href="<?= ASSET_URL ?>/css/landing.css">
-</head>
-<body class="landing-body">
-
-    <!-- THONG BAO DIALOG (Admin) -->
-    <?php if (!empty($announcements_list)): ?>
-    <div id="announcementModal" class="modal-overlay" style="display:flex;">
-        <div class="modal-box" style="max-width:640px; width:95%; max-height:88vh; display:flex; flex-direction:column; padding:2rem;">
-            <div class="modal-icon" style="margin-bottom:0.5rem; font-size:2.5rem;">📢</div>
-            <h2 style="margin-bottom:1.2rem; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:1rem; font-size:1.5rem; color:white;">Thông Báo Hệ Thống</h2>
-            
-            <div class="announcement-scroll" style="overflow-y:auto; flex:1; padding-right:10px; margin-bottom:1.5rem; text-align:left;">
-                <?php foreach($announcements_list as $index => $a): ?>
-                <div class="announcement-card">
-                    <div class="announcement-card-header">
-                        <?php if($index === 0): ?>
-                            <span class="announcement-badge-new">Mới nhất</span>
-                        <?php endif; ?>
-                        <h3 class="announcement-card-title"><?= htmlspecialchars($a['tieu_de']) ?></h3>
-                    </div>
-
-                    <?php if(!empty($a['hinh_anh'])): ?>
-                    <div class="announcement-img-wrapper">
-                        <img src="<?= ASSET_URL . htmlspecialchars($a['hinh_anh']) ?>" alt="<?= htmlspecialchars($a['tieu_de']) ?>" class="announcement-img" loading="lazy">
-                    </div>
-                    <?php endif; ?>
-
-                    <div class="announcement-card-body"><?= htmlspecialchars($a['noi_dung']) ?></div>
-                    <div class="announcement-card-date">
-                        <span>📅</span> <?= date('H:i - d/m/Y', strtotime($a['created_at'])) ?>
-                    </div>
-                </div>
-                <?php endforeach; ?>
-            </div>
-            
-            <button class="btn btn-primary" onclick="document.getElementById('announcementModal').style.display='none'" style="width:100%; padding:1rem; font-weight:600; font-size:1rem; border-radius:12px; cursor:pointer;">Đã hiểu</button>
-        </div>
-    </div>
+    <title>Monkey Gym | Phòng Tập Công Nghệ 4.0</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Outfit:wght@700;900&display=swap" rel="stylesheet">
     <style>
-        /* Scrollbar */
-        .announcement-scroll::-webkit-scrollbar { width: 6px; }
-        .announcement-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); border-radius: 10px; }
-        .announcement-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
-        .announcement-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
-
-        /* Card container */
-        .announcement-card {
-            background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 14px;
-            padding: 1.3rem;
-            margin-bottom: 1rem;
-            transition: border-color 0.3s ease, box-shadow 0.3s ease;
-        }
-        .announcement-card:last-child { margin-bottom: 0; }
-        .announcement-card:hover {
-            border-color: rgba(16,185,129,0.25);
-            box-shadow: 0 4px 20px rgba(16,185,129,0.06);
+        :root {
+            --bg-main: #09090b;
+            --bg-card: #18181b;
+            --primary: #84cc16; /* Monkey Green */
+            --primary-glow: rgba(132, 204, 22, 0.3);
+            --text-main: #f4f4f5;
+            --text-muted: #a1a1aa;
+            --border: rgba(255, 255, 255, 0.1);
         }
 
-        /* Header */
-        .announcement-card-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 0.7rem;
-            flex-wrap: wrap;
-        }
-        .announcement-card-title {
-            color: #10b981;
-            font-size: 1.1rem;
-            margin: 0;
-            line-height: 1.4;
-        }
-        .announcement-badge-new {
-            font-size: 0.68rem;
-            background: rgba(239,68,68,0.15);
-            color: #ef4444;
-            padding: 3px 10px;
-            border-radius: 5px;
-            border: 1px solid rgba(239,68,68,0.25);
-            text-transform: uppercase;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            flex-shrink: 0;
-            animation: pulse-badge 2s ease-in-out infinite;
-        }
-        @keyframes pulse-badge {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-main); color: var(--text-main); line-height: 1.6; overflow-x: hidden; }
+        a { text-decoration: none; color: inherit; }
+        img { max-width: 100%; display: block; }
 
-        /* Image */
-        .announcement-img-wrapper {
-            width: 100%;
-            max-height: 300px;
-            border-radius: 10px;
-            overflow: hidden;
-            margin-bottom: 0.8rem;
-            background: rgba(0,0,0,0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .announcement-img {
-            width: 100%;
-            height: auto;
-            max-height: 300px;
-            object-fit: contain;
-            display: block;
-        }
+        /* Nút Bấm */
+        .btn-neon { background: var(--primary); color: #000; padding: 12px 28px; border-radius: 8px; font-weight: 700; text-transform: uppercase; display: inline-block; transition: 0.3s; box-shadow: 0 0 15px var(--primary-glow); border: none; cursor: pointer; }
+        .btn-neon:hover { background: #fff; transform: translateY(-3px); box-shadow: 0 0 25px rgba(255,255,255,0.4); }
+        .btn-outline { border: 1px solid var(--border); padding: 12px 28px; border-radius: 8px; font-weight: 600; transition: 0.3s; display: inline-block; }
+        .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
 
-        /* Body */
-        .announcement-card-body {
-            font-size: 0.93rem;
-            color: #94a3b8;
-            line-height: 1.7;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
+        /* Tiêu đề Chung */
+        .sec-title { font-family: 'Outfit', sans-serif; font-size: 3rem; text-transform: uppercase; margin-bottom: 1rem; line-height: 1.1; }
+        .sec-title span { color: var(--primary); }
+        .sec-desc { color: var(--text-muted); font-size: 1.1rem; max-width: 600px; margin-bottom: 3rem; }
+        .section { padding: 6rem 5%; max-width: 1400px; margin: 0 auto; }
 
-        /* Date */
-        .announcement-card-date {
-            font-size: 0.75rem;
-            color: #64748b;
-            margin-top: 0.8rem;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            padding-top: 0.7rem;
-            border-top: 1px solid rgba(255,255,255,0.05);
+        /* Navbar */
+        .navbar { position: fixed; top: 0; width: 100%; padding: 1rem 5%; background: rgba(9,9,11,0.8); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; z-index: 1000; }
+        .nav-logo { font-family: 'Outfit', sans-serif; font-size: 1.8rem; font-weight: 900; display: flex; align-items: center; gap: 8px; }
+        .nav-logo span { color: var(--primary); }
+        .nav-links { display: flex; gap: 2rem; font-weight: 500; color: var(--text-muted); }
+        .nav-links a:hover { color: var(--primary); }
+
+        /* Hero */
+        .hero { min-height: 100vh; display: flex; align-items: center; padding: 0 5%; background: linear-gradient(rgba(9,9,11,0.8), rgba(9,9,11,1)), url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1920') center/cover; position: relative; }
+        .hero-content { max-width: 800px; z-index: 1; margin-top: 5rem; }
+        .hero-badge { display: inline-block; padding: 5px 15px; border: 1px solid var(--primary); color: var(--primary); border-radius: 50px; font-weight: 600; margin-bottom: 1.5rem; text-transform: uppercase; font-size: 0.85rem; }
+        .hero h1 { font-family: 'Outfit', sans-serif; font-size: clamp(3.5rem, 8vw, 6rem); line-height: 1; text-transform: uppercase; margin-bottom: 1.5rem; }
+        .hero h1 span { color: transparent; -webkit-text-stroke: 1px var(--primary); }
+
+        /* Lưới 3/4 Cột Chung */
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; }
+        
+        /* Card Thiết Kế Chung */
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; transition: 0.3s; }
+        .card:hover { border-color: var(--primary); transform: translateY(-5px); }
+
+        /* [MỚI] Form Đăng Ký Tập Thử */
+        .trial-banner { background: linear-gradient(135deg, #18181b 0%, #064e3b 100%); border-radius: 20px; padding: 3rem; margin-top: -80px; position: relative; z-index: 10; border: 1px solid var(--primary); display: flex; flex-wrap: wrap; gap: 2rem; align-items: center; justify-content: space-between; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .trial-text h3 { font-family: 'Outfit'; font-size: 2.5rem; color: var(--primary); text-transform: uppercase; }
+        .trial-form { display: flex; gap: 10px; flex: 1; min-width: 300px; }
+        .trial-form input { flex: 1; padding: 15px; border-radius: 8px; border: 1px solid var(--border); background: #000; color: #fff; font-size: 1rem; outline: none; }
+        .trial-form input:focus { border-color: var(--primary); }
+
+        /* [MỚI] Công cụ BMI */
+        .bmi-box { background: var(--bg-card); padding: 3rem; border-radius: 20px; border: 1px dashed var(--primary); text-align: center; }
+        .bmi-input-group { display: flex; gap: 1rem; justify-content: center; margin: 2rem 0; }
+        .bmi-input-group input { padding: 15px; width: 150px; background: #000; border: 1px solid var(--border); color: #fff; border-radius: 8px; text-align: center; font-size: 1.1rem; }
+        #bmiResult { font-size: 2rem; font-family: 'Outfit'; color: var(--primary); margin-top: 1rem; display: none; }
+
+        /* Gói Tập */
+        .price-card.popular { border-color: var(--primary); transform: scale(1.05); background: linear-gradient(to bottom, rgba(132,204,22,0.1), var(--bg-card)); }
+        .price-card ul { list-style: none; margin: 2rem 0; }
+        .price-card ul li { margin-bottom: 10px; display: flex; gap: 10px; }
+        .price-card ul li::before { content: '✓'; color: var(--primary); font-weight: bold; }
+
+        /* HLV & Tin tức */
+        .img-box { width: 100%; height: 250px; background: #27272a; border-radius: 12px; margin-bottom: 1.5rem; overflow: hidden; }
+        .img-box img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(80%); transition: 0.3s; }
+        .card:hover .img-box img { filter: grayscale(0%); }
+        .badge { background: rgba(132,204,22,0.2); color: var(--primary); padding: 4px 12px; border-radius: 50px; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; display: inline-block; }
+
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .trial-form { flex-direction: column; }
+            .price-card.popular { transform: none; }
         }
     </style>
-    <?php endif; ?>
+</head>
+<body>
 
-    <!-- HEADER NAV -->
-    <nav class="landing-nav" id="landingNav">
-        <div class="nav-container">
-            <a href="<?= SITE_URL ?>/" class="nav-logo">
-                <img src="<?= ASSET_URL ?>/favicon.png" alt="Monkey Gym" width="36">
-                <span>Monkey <strong>Gym</strong></span>
-            </a>
-            <div class="nav-links">
-                <a href="#features">Tính năng</a>
-                <a href="#trainers">Huấn luyện viên</a>
-                <a href="#products">Sản phẩm</a>
-                <a href="#pricing">Gói tập</a>
-            </div>
-            <div class="nav-actions">
-                <a href="<?= SITE_URL ?>/login" class="btn-nav-login">Đăng nhập</a>
-                <a href="<?= SITE_URL ?>/register" class="btn-nav-register">Đăng ký ngay</a>
-            </div>
+    <nav class="navbar">
+        <div class="nav-logo">🐵 MONKEY<span>GYM</span></div>
+        <div class="nav-links">
+            <a href="#co-so">Cơ sở vật chất</a>
+            <a href="#lop-hoc">Lớp học</a>
+            <a href="#hlv">Huấn luyện viên</a>
+            <a href="#goi-tap">Gói tập</a>
+            <a href="#tin-tuc">Tin tức</a>
+        </div>
+        <div>
+            <a href="<?= SITE_URL ?>/login" style="margin-right: 15px; font-weight: bold;">Đăng nhập</a>
+            <a href="<?= SITE_URL ?>/register" class="btn-neon" style="padding: 10px 20px;">Gia nhập ngay</a>
         </div>
     </nav>
 
-    <!-- HERO SECTION -->
-    <section class="hero-section">
-        <div class="hero-bg-grid"></div>
-        <div class="hero-container">
-            <div class="hero-badge">🔥 Phòng Tập Hàng Đầu</div>
-            <h1 class="hero-title">
-                Vượt Qua <span class="gradient-text">Giới Hạn</span><br>
-                Kiến Tạo Bản Thân
-            </h1>
-            <p class="hero-desc">
-                Monkey Gym — nơi công nghệ gặp gỡ thể lực. Hệ thống quản lý thông minh, đội ngũ HLV cao cấp và cộng đồng hội viên nhiệt huyết đang chờ bạn.
-            </p>
-            <div class="hero-actions">
-                <a href="<?= SITE_URL ?>/register" class="btn-hero-primary">Bắt đầu miễn phí →</a>
-                <a href="#features" class="btn-hero-ghost">Khám phá thêm</a>
-            </div>
-
-            <!-- KHUYẾN MÃI DÀNH CHO HỘI VIÊN MỚI -->
-            <?php if (!empty($promotions)): ?>
-            <div style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); border-radius: 12px; padding: 15px; margin: 2rem auto; max-width: 600px; color: white; border: 2px dashed #60a5fa; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4); animation: pulsePromo 2s infinite; text-align: left;">
-                <h3 style="margin-top:0; font-size: 1.1rem; text-align:center; color: #fcd34d;">🎁 QUÀ TẶNG THÀNH VIÊN MỚI</h3>
-                <div style="font-size: 0.9rem; margin-bottom: 10px; text-align: center;">Đăng ký ngay hôm nay để sử dụng các ưu đãi cực khủng:</div>
-                
-                <?php foreach($promotions as $p): ?>
-                    <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; margin-bottom: 8px; display:flex; justify-content: space-between; align-items:center;">
-                        <div>
-                            <div style="font-family: monospace; font-size: 1.2rem; font-weight: bold; color: #fcd34d; letter-spacing: 2px;"><?= htmlspecialchars($p['code']) ?></div>
-                            <div style="font-size: 0.8rem; margin-top:4px;">
-                                <?php if($p['loai_ap_dung'] === 'package') echo 'Mã mua Gói Tập';
-                                      elseif($p['loai_ap_dung'] === 'product') echo 'Mã mua Sản Phẩm';
-                                      else echo 'Áp dụng mọi dịch vụ'; ?>
-                            </div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div style="font-size: 1.3rem; font-weight: bold; color: #fff;">
-                                Giảm <?php echo ($p['phan_tram_giam'] > 0) ? $p['phan_tram_giam'].'%' : number_format($p['so_tien_giam']).'đ'; ?>
-                            </div>
-                            <div style="font-size: 0.75rem; color: #fca5a5; margin-top:2px;">
-                                ⏳ Chỉ còn <strong><?= $p['so_luong_con'] ?></strong> lượt!<br>
-                                Hết hạn: <?= date('d/m/Y', strtotime($p['ngay_het_han'])) ?>
-                            </div>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-            <style>
-                @keyframes pulsePromo {
-                    0% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.7); }
-                    70% { box-shadow: 0 0 0 10px rgba(96, 165, 250, 0); }
-                    100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0); }
-                }
-            </style>
-            <?php endif; ?>
-
-            <div class="hero-stats">
-                <div class="stat-item"><span class="stat-num">500+</span><span>Hội viên</span></div>
-                <div class="stat-sep"></div>
-                <div class="stat-item"><span class="stat-num"><?= count($trainers) ?>+</span><span>HLV</span></div>
-                <div class="stat-sep"></div>
-                <div class="stat-item"><span class="stat-num"><?= count($packages) ?>+</span><span>Gói tập</span></div>
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">Phòng Tập Công Nghệ 4.0</div>
+            <h1>Kiến Tạo <span>Vóc Dáng</span><br>Chinh Phục Đỉnh Cao</h1>
+            <p class="sec-desc" style="font-size: 1.2rem;">Trải nghiệm hệ thống quản lý thông minh nhất 2026. Đội ngũ HLV tâm huyết, cơ sở vật chất 5 sao và cộng đồng gymers nhiệt huyết đang chờ đón bạn.</p>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <a href="#goi-tap" class="btn-neon">Xem gói tập →</a>
+                <a href="#co-so" class="btn-outline">Khám phá không gian</a>
             </div>
         </div>
     </section>
 
-    <!-- FEATURES -->
-    <section class="section" id="features">
-        <div class="section-container">
-            <div class="section-header">
-                <h2>Vì Sao Chọn Monkey Gym?</h2>
-                <p>Hệ thống toàn diện — từ mua gói đến check-in, từ PT đến dinh dưỡng.</p>
+    <div style="padding: 0 5%; max-width: 1400px; margin: 0 auto;">
+        <div class="trial-banner">
+            <div class="trial-text">
+                <h3>Trải Nghiệm 3 Ngày Miễn Phí</h3>
+                <p>Nhập số điện thoại để nhận ngay mã tập thử tập Gym, Yoga & Xông hơi.</p>
             </div>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">🏋️</div>
-                    <h3>HLV Chuyên Nghiệp</h3>
-                    <p>Đội ngũ HLV được chứng nhận, lên lịch PT linh hoạt trực tiếp trên ứng dụng.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📱</div>
-                    <h3>Check-in QR Code</h3>
-                    <p>Quét mã QR điểm danh tức khắc. Mỗi lần check-in tích thêm điểm thưởng.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">⭐</div>
-                    <h3>Hệ Thống Giảm Giá</h3>
-                    <p>Săn voucher, mua combo, ưu đãi khách hàng thân thiết — chốt đơn giá hời, nâng cấp buổi tập.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📓</div>
-                    <h3>Giao diện hiện đại</h3>
-                    <p>Phong cách tối giản, bố cục chuyên nghiệp và mượt mà — mang lại trải nghiệm người dùng hoàn hảo trên mọi thiết bị.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🛍️</div>
-                    <h3>Cửa Hàng Online</h3>
-                    <p>Mua Whey Protein, Pre-Workout ngay trên app. Nhận hàng tại quầy với mã QR.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🔒</div>
-                    <h3>Thuê Tủ Đồ</h3>
-                    <p>Hội viên có thể thuê tủ đồ cá nhân hàng tháng — không cần mang đồ mỗi ngày.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- TRAINERS -->
-    <section class="section section-dark" id="trainers">
-        <div class="section-container">
-            <div class="section-header">
-                <h2>Đội Ngũ Huấn Luyện Viên</h2>
-                <p>Những chuyên gia hàng đầu đồng hành cùng hành trình của bạn.</p>
-            </div>
-            <?php if (!empty($trainers)): ?>
-            <div class="trainers-grid">
-                <?php foreach (array_slice($trainers, 0, 4) as $t): ?>
-                <?php
-                    $tName = htmlspecialchars($t['ho_ten'] ?? $t['ten_dang_nhap']);
-                    $tReviews = $trainerReviews[$t['ma_hlv']] ?? [];
-                ?>
-                <div class="trainer-card" style="cursor:pointer;" onclick="openTrainerModal(this)"
-                    data-name="<?= $tName ?>"
-                    data-spec="<?= htmlspecialchars($t['chuyen_mon'] ?? 'Tập luyện') ?>"
-                    data-exp="<?= (int)($t['nam_kinh_nghiem'] ?? 0) ?>"
-                    data-desc="<?= htmlspecialchars($t['gioi_thieu'] ?? $t['mo_ta'] ?? '') ?>"
-                    data-rating="<?= number_format($t['avg_rating'] ?? 5, 1) ?>"
-                    data-review-count="<?= (int)($t['review_count'] ?? 0) ?>"
-                    data-avatar="<?= !empty($t['anh_dai_dien']) ? ASSET_URL . htmlspecialchars($t['anh_dai_dien']) : '' ?>"
-                    data-reviews="<?= htmlspecialchars(json_encode($tReviews, JSON_UNESCAPED_UNICODE)) ?>"
-                >
-                    <div class="trainer-avatar">
-                        <?php if (!empty($t['anh_dai_dien'])): ?>
-                            <img src="<?= ASSET_URL . htmlspecialchars($t['anh_dai_dien']) ?>" alt="<?= $tName ?>">
-                        <?php else: ?>
-                            <div class="avatar-placeholder">👤</div>
-                        <?php endif; ?>
-                    </div>
-                    <div class="trainer-info">
-                        <h3><?= $tName ?></h3>
-                        <span class="trainer-spec"><?= htmlspecialchars($t['chuyen_mon'] ?? 'Tập luyện') ?></span>
-                        <?php if (!empty($t['nam_kinh_nghiem'])): ?>
-                        <span class="trainer-exp"><?= $t['nam_kinh_nghiem'] ?> năm KN</span>
-                        <?php endif; ?>
-                        <div class="trainer-rating">
-                            <?php $stars = round($t['avg_rating'] ?? 5); ?>
-                            <?= str_repeat('⭐', min($stars, 5)) ?>
-                            <span>(<?= number_format($t['avg_rating'] ?? 5, 1) ?>) · <?= (int)($t['review_count'] ?? 0) ?> đánh giá</span>
-                        </div>
-                    </div>
-                </div>
-                <?php endforeach; ?>
-            </div>
-            <?php else: ?>
-            <p class="text-center text-muted">Chưa có thông tin huấn luyện viên.</p>
-            <?php endif; ?>
-        </div>
-    </section>
-
-    <!-- TRAINER DETAIL MODAL -->
-    <div id="trainerModal" class="modal-overlay" style="display:none;">
-        <div class="modal-box" style="max-width:640px; width:95%; max-height:90vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
-            <!-- Header -->
-            <div style="padding:2rem 2rem 1.5rem; text-align:center; border-bottom:1px solid rgba(255,255,255,0.08); flex-shrink:0;">
-                <div id="tmAvatar" style="width:100px; height:100px; border-radius:50%; margin:0 auto 1rem; overflow:hidden; border:3px solid rgba(139,92,246,0.4); background:rgba(139,92,246,0.1); display:flex; align-items:center; justify-content:center; font-size:2.5rem;">👤</div>
-                <h2 id="tmName" style="color:white; font-size:1.4rem; margin-bottom:0.4rem;"></h2>
-                <span id="tmSpec" style="background:rgba(139,92,246,0.15); color:#a78bfa; padding:0.3rem 1rem; border-radius:50px; font-size:0.85rem; display:inline-block;"></span>
-                <div id="tmExp" style="color:var(--text-secondary); font-size:0.9rem; margin-top:0.8rem;"></div>
-                <div id="tmRating" style="margin-top:0.6rem; font-size:1.1rem;"></div>
-            </div>
-            <!-- Scrollable body -->
-            <div style="overflow-y:auto; padding:1.5rem 2rem 2rem; flex:1;">
-                <div id="tmDescBlock" style="margin-bottom:1.5rem;">
-                    <h4 style="color:white; margin-bottom:0.5rem; font-size:0.95rem;">📝 Giới thiệu</h4>
-                    <p id="tmDesc" style="color:var(--text-secondary); font-size:0.9rem; line-height:1.6;"></p>
-                </div>
-                <div id="tmReviewsBlock">
-                    <h4 style="color:white; margin-bottom:1rem; font-size:0.95rem;">💬 Đánh giá từ hội viên <span id="tmReviewCount" style="color:var(--text-secondary); font-size:0.85rem;"></span></h4>
-                    <div id="tmReviewsList"></div>
-                    <p id="tmNoReviews" style="color:var(--text-secondary); font-size:0.85rem; display:none;">Chưa có đánh giá nào.</p>
-                </div>
-            </div>
-            <!-- Close -->
-            <div style="padding:1rem 2rem; border-top:1px solid rgba(255,255,255,0.08); flex-shrink:0;">
-                <button class="btn btn-primary" onclick="document.getElementById('trainerModal').style.display='none'" style="width:100%; padding:0.8rem; font-size:0.95rem; border-radius:10px; cursor:pointer;">Đóng</button>
-            </div>
+            <form class="trial-form" id="formTapThu">
+                <input type="text" id="trialName" placeholder="Họ và tên của bạn" required>
+                <input type="tel" id="trialPhone" placeholder="Số điện thoại" required>
+                <button type="submit" class="btn-neon" id="btnSubmitTrial">Nhận Vé Ngay</button>
+            </form>
+            <div id="trialMessage" style="width: 100%; margin-top: 15px; font-weight: bold; display: none; text-align: center;"></div>
         </div>
     </div>
 
-    <!-- PRICING -->
-    <?php
-    $getBestPrice = function($originalPrice, $type) use ($promotions) {
-        if (empty($promotions)) return $originalPrice;
-        $bestPrice = $originalPrice;
-        foreach ($promotions as $p) {
-            if ($p['loai_ap_dung'] === 'all' || $p['loai_ap_dung'] === $type) {
-                if ($p['phan_tram_giam'] > 0) {
-                    $discounted = max(0, $originalPrice * (1 - $p['phan_tram_giam'] / 100));
-                } else {
-                    $discounted = max(0, $originalPrice - $p['so_tien_giam']);
-                }
-                if ($discounted < $bestPrice) {
-                    $bestPrice = $discounted;
-                }
-            }
-        }
-        return $bestPrice;
-    };
-    ?>
-    <section class="section" id="pricing">
-        <div class="section-container">
-            <div class="section-header">
-                <h2>💪 Gói Tập (Dịch Vụ Thành Viên)</h2>
-                <p>Lựa chọn mềm mại cho từng chu kỳ và mục tiêu tập luyện của bạn.</p>
+    <section id="co-so" class="section">
+        <h2 class="sec-title">Hệ Thống <span>Không Gian</span></h2>
+        <p class="sec-desc">Không gian tập luyện hiện đại với thiết kế Dark Mode & Neon độc bản.</p>
+        <div class="grid-3">
+            <div class="card">
+                <div class="img-box"><img src="https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=800" alt="Khu tập"></div>
+                <h3 style="font-size: 1.3rem; margin-bottom: 10px;">Khu Vực Tập Luyện Tập Trung</h3>
+                <p style="color: var(--text-muted);">Hệ thống máy tập nhập khẩu 100%, đèn Neon động lực học giúp tăng hiệu suất.</p>
             </div>
-            <?php if (!empty($packages)): ?>
-            <div class="pricing-grid">
-                <?php foreach ($packages as $i => $pkg): ?>
-                <div class="pricing-card <?= $i === 1 ? 'pricing-popular' : '' ?>">
-                    <?php if ($i === 1): ?><div class="popular-badge">Phổ Biến Nhất</div><?php endif; ?>
-                    <h3><?= htmlspecialchars($pkg['ten_goi']) ?></h3>
-                    <?php $bestPrice = $getBestPrice($pkg['gia_tien'], 'package'); ?>
-                    <?php if ($bestPrice < $pkg['gia_tien']): ?>
-                        <div class="pkg-price">
-                            <span style="font-size: 1.1rem; color: #9ca3af; text-decoration: line-through; margin-right: 8px;"><?= number_format($pkg['gia_tien']) ?>đ</span>
-                            <br><span style="font-size: 0.9rem; color: var(--danger); font-weight: normal;">Chỉ còn: </span><span style="color: var(--danger);"><?= number_format($bestPrice) ?><span>đ</span></span>
-                        </div>
-                    <?php else: ?>
-                        <div class="pkg-price"><?= number_format($pkg['gia_tien']) ?><span>đ</span></div>
-                    <?php endif; ?>
-                    <div class="pkg-duration"><?= $pkg['thoi_han_thang'] ?> tháng</div>
-                    <?php if ($pkg['so_buoi_pt'] > 0): ?>
-                    <div class="pkg-pt">✓ <?= $pkg['so_buoi_pt'] ?> buổi PT</div>
-                    <?php endif; ?>
-                    <a href="<?= SITE_URL ?>/register" class="btn-pricing">Đăng Ký Ngay</a>
+            <div class="card">
+                <div class="img-box"><img src="https://images.unsplash.com/photo-1576678927484-cc907957088c?q=80&w=800" alt="Sauna"></div>
+                <h3 style="font-size: 1.3rem; margin-bottom: 10px;">Xông Hơi & Thư Giãn</h3>
+                <p style="color: var(--text-muted);">Phòng Sauna đá muối chuẩn Thụy Điển giúp phục hồi cơ bắp cực tốc sau tập.</p>
+            </div>
+            <div class="card">
+                <div class="img-box"><img src="https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=800" alt="PT Room"></div>
+                <h3 style="font-size: 1.3rem; margin-bottom: 10px;">Khu Vực PT 1-1 Riêng Tư</h3>
+                <p style="color: var(--text-muted);">Không gian tĩnh, máy móc chuyên biệt nơi các HLV đồng hành cùng lộ trình của bạn.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="lop-hoc" class="section" style="background: var(--bg-card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+        <h2 class="sec-title">Lớp Học <span>Năng Lượng</span></h2>
+        <p class="sec-desc">Đa dạng bộ môn giúp bạn đốt mỡ, xả stress và kết nối cộng đồng.</p>
+        <div class="grid-3">
+            <?php if(!empty($classes)): ?>
+                <?php foreach($classes as $c): ?>
+                <div class="card" style="background: #000;">
+                    <div class="badge"><?= htmlspecialchars($c['loai_lop'] ?? 'Lớp Học') ?></div>
+                    <h3 style="font-size: 1.8rem; font-family: 'Outfit';"><?= htmlspecialchars($c['ten_lop']) ?></h3>
+                    <p style="color: var(--text-muted); margin: 15px 0;"><?= htmlspecialchars(mb_substr(strip_tags($c['mo_ta'] ?? ''), 0, 100)) ?>...</p>
+                    <div style="color: var(--primary); font-weight: bold;"><a href="<?= SITE_URL ?>/login">Đăng nhập để xem lịch</a></div>
                 </div>
                 <?php endforeach; ?>
-            </div>
+            <?php else: ?>
+                <p style="text-align:center; color:var(--text-muted); grid-column: 1/-1;">Đang cập nhật danh sách lớp học.</p>
             <?php endif; ?>
         </div>
     </section>
 
-    <!-- PRODUCTS -->
-    <section class="section section-dark" id="products">
-        <div class="section-container">
-            <div class="section-header">
-                <h2>🛍️ Cửa Hàng Sản Phẩm</h2>
-                <p>Whey Protein, Pre-Workout và các sản phẩm bổ sung thể dục chất lượng cao.</p>
+    <section class="section">
+        <div class="bmi-box">
+            <h2 class="sec-title" style="font-size: 2.5rem;">Kiểm Tra <span>Chỉ Số BMI</span></h2>
+            <p>Biết rõ cơ thể mình để chọn phương pháp tập luyện chính xác nhất.</p>
+            
+            <div class="bmi-input-group">
+                <input type="number" id="bmiHeight" placeholder="Chiều cao (cm)" required>
+                <input type="number" id="bmiWeight" placeholder="Cân nặng (kg)" required>
             </div>
-            <?php if (!empty($products)): ?>
-            <div class="products-grid">
-                <?php foreach ($products as $p): ?>
-                <div class="product-card">
-                    <?php if (!empty($p['hinh_anh'])): ?>
-                        <div class="product-image">
-                            <img src="<?= ASSET_URL . $p['hinh_anh'] ?>" alt="<?= htmlspecialchars($p['ten_sp']) ?>">
-                        </div>
-                    <?php else: ?>
-                        <div class="product-image-placeholder">
-                            <div style="font-size: 2rem;">📦</div>
-                        </div>
+            <button class="btn-neon" onclick="calculateBMI()">Phân Tích Cơ Thể</button>
+            
+            <div id="bmiResult"></div>
+        </div>
+
+        <script>
+            function calculateBMI() {
+                let h = document.getElementById('bmiHeight').value;
+                let w = document.getElementById('bmiWeight').value;
+                if(h > 0 && w > 0) {
+                    let bmi = (w / ((h/100) * (h/100))).toFixed(1);
+                    let status = bmi < 18.5 ? "Thiếu Cân (Cần tăng cơ)" : (bmi < 25 ? "Cân Đối (Giữ form)" : "Thừa Cân (Cần giảm mỡ)");
+                    let resBox = document.getElementById('bmiResult');
+                    resBox.style.display = 'block';
+                    resBox.innerHTML = `BMI của bạn: ${bmi} - <span style="color: #fff;">${status}</span>`;
+                } else {
+                    alert("Vui lòng nhập số hợp lệ!");
+                }
+            }
+        </script>
+    </section>
+
+    <section id="hlv" class="section">
+        <h2 class="sec-title">Đội Ngũ <span>Chuyên Gia</span></h2>
+        <p class="sec-desc">Những người thầy, người bạn đồng hành tin cậy trên hành trình của bạn.</p>
+        <div class="grid-3">
+            <?php if(!empty($trainers)): ?>
+                <?php foreach(array_slice($trainers, 0, 3) as $t): ?>
+                <div class="card" style="text-align: center;">
+                    <div class="img-box">
+                        <?php if(!empty($t['anh_dai_dien'])): ?>
+                            <img src="<?= ASSET_URL . $t['anh_dai_dien'] ?>" alt="HLV">
+                        <?php else: ?>
+                            <img src="https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?q=80&w=600" alt="HLV">
+                        <?php endif; ?>
+                    </div>
+                    <div class="badge"><?= htmlspecialchars($t['chuyen_mon'] ?? 'Chuyên gia') ?></div>
+                    <h3><?= htmlspecialchars($t['ho_ten'] ?? $t['ten_dang_nhap']) ?></h3>
+                    <div style="color: #fbbf24; font-weight: bold; margin-top: 10px;">★★★★★ 5.0</div>
+                </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <p style="text-align:center; color:var(--text-muted); grid-column: 1/-1;">Chưa có dữ liệu HLV.</p>
+            <?php endif; ?>
+        </div>
+    </section>
+
+    <section id="goi-tap" class="section">
+        <h2 class="sec-title" style="text-align: center;">Đầu Tư <span>Cho Sức Khỏe</span></h2>
+        <p class="sec-desc" style="margin: 0 auto 3rem; text-align: center;">Khoản đầu tư thông minh nhất không bao giờ lỗ.</p>
+        <div class="grid-3">
+            <?php if(!empty($packages)): ?>
+                <?php foreach($packages as $index => $pkg): 
+                    $isPopular = ($index === 1); // Đánh dấu gói thứ 2 là phổ biến nhất
+                ?>
+                <div class="card price-card <?= $isPopular ? 'popular' : '' ?>" <?= $isPopular ? 'style="position: relative;"' : '' ?>>
+                    <?php if($isPopular): ?>
+                        <div style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--primary); color: #000; padding: 4px 15px; border-radius: 50px; font-weight: bold; font-size: 0.8rem;">BÁN CHẠY NHẤT</div>
                     <?php endif; ?>
-                    <div class="product-info">
-                        <h4><?= htmlspecialchars($p['ten_sp']) ?></h4>
-                        <p class="text-muted" style="font-size: 0.85rem; margin: 0.5rem 0;">Mo ta: <?= htmlspecialchars(substr($p['mo_ta'] ?? '', 0, 60)) ?>...</p>
-                        <div class="product-footer">
-                            <?php $bestPrice = $getBestPrice($p['gia_tien'], 'product'); ?>
-                            <?php if ($bestPrice < $p['gia_tien']): ?>
-                                <div style="display:flex; flex-direction:column; line-height:1.2;">
-                                    <span style="font-size: 0.85rem; color: #9ca3af; text-decoration: line-through;"><?= number_format($p['gia_tien']) ?>đ</span>
-                                    <span class="product-price" style="color: var(--danger); font-size:1.1rem;">
-                                        <span style="font-size: 0.75rem; font-weight: normal;">Ưu đãi: </span><?= number_format($bestPrice) ?><span>đ</span>
-                                    </span>
-                                </div>
-                            <?php else: ?>
-                                <span class="product-price"><?= number_format($p['gia_tien']) ?><span>đ</span></span>
-                            <?php endif; ?>
-                            <a href="<?= SITE_URL ?>/member/store" class="btn-product-buy">Mua Ngay</a>
-                        </div>
+                    
+                    <h3 style="font-size: 1.5rem; color: <?= $isPopular ? '#fff' : 'var(--text-muted)' ?>;"><?= htmlspecialchars($pkg['ten_goi']) ?></h3>
+                    <div style="font-size: <?= $isPopular ? '3rem' : '2.5rem' ?>; <?= $isPopular ? 'color: var(--primary);' : '' ?> font-family: 'Outfit'; font-weight: 900; margin: 10px 0;">
+                        <?= number_format($pkg['gia_tien']) ?>đ
+                    </div>
+                    <div style="font-size: 0.9rem; color: var(--text-muted);"><?= $pkg['thoi_han_thang'] ?> tháng sử dụng</div>
+                    <ul>
+                        <li>Full quyền truy cập 24/7</li>
+                        <li>Tủ đồ cá nhân & Sauna</li>
+                        <?php if($pkg['loai_goi'] === 'pt_1_1' || strpos(strtolower($pkg['ten_goi']), 'pt') !== false): ?>
+                            <li style="color: #fff; font-weight: bold;">Kèm theo HLV cá nhân</li>
+                        <?php endif; ?>
+                    </ul>
+                    <a href="<?= SITE_URL ?>/register" class="<?= $isPopular ? 'btn-neon' : 'btn-outline' ?>" style="width: 100%; text-align: center;">Đăng Ký Ngay</a>
+                </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <p style="text-align:center; color:var(--text-muted); grid-column: 1/-1;">Đang cập nhật danh sách gói tập.</p>
+            <?php endif; ?>
+        </div>
+    </section>
+
+    <section class="section" style="background: var(--bg-card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+        <h2 class="sec-title text-center">Câu Chuyện <span>Thành Công</span></h2>
+        <div class="grid-3" style="margin-top: 3rem;">
+            <div class="card" style="background: #000;">
+                <div style="color: var(--primary); font-size: 2rem; margin-bottom: 10px;">"</div>
+                <p style="font-style: italic; color: #ccc; margin-bottom: 20px;">"Môi trường tập ở đây siêu đã, máy móc xịn mà lại không bị quá tải. HLV hướng dẫn nhiệt tình giúp mình giảm 5kg trong 2 tháng."</p>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <div style="width: 50px; height: 50px; border-radius: 50%; background: #fff; overflow: hidden;"><img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200"></div>
+                    <div>
+                        <div style="font-weight: bold;">Minh Anh</div>
+                        <div style="font-size: 0.8rem; color: var(--primary);">Hội viên VIP</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card" style="background: #000;">
+                <div style="color: var(--primary); font-size: 2rem; margin-bottom: 10px;">"</div>
+                <p style="font-style: italic; color: #ccc; margin-bottom: 20px;">"Công cụ check-in bằng QR quá tiện lợi, mình thỉnh thoảng quên thẻ cứng ở nhà nhưng vẫn quét điện thoại vào tập bình thường."</p>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <div style="width: 50px; height: 50px; border-radius: 50%; background: #fff; overflow: hidden;"><img src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=200"></div>
+                    <div>
+                        <div style="font-weight: bold;">Tuấn Khang</div>
+                        <div style="font-size: 0.8rem; color: var(--primary);">Hội viên Basic</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="tin-tuc" class="section">
+        <h2 class="sec-title">Tin Tức <span>& Thông Báo</span></h2>
+        <p class="sec-desc">Cập nhật những hoạt động mới nhất từ hệ thống Monkey Gym.</p>
+        
+        <div class="grid-3">
+            <?php if(!empty($announcements_list)): ?>
+                <?php foreach(array_slice($announcements_list, 0, 3) as $ann): ?>
+                <div class="card" style="display: flex; gap: 20px; align-items: center; background: #000;">
+                    <div style="background: rgba(132,204,22,0.1); border: 1px solid var(--primary); color: var(--primary); padding: 15px; border-radius: 12px; text-align: center; min-width: 80px;">
+                        <div style="font-size: 2rem; font-weight: 900; font-family: 'Outfit'; line-height: 1;"><?= date('d', strtotime($ann['created_at'])) ?></div>
+                        <div style="font-size: 0.8rem; text-transform: uppercase; font-weight: bold;">T<?= date('m', strtotime($ann['created_at'])) ?></div>
+                    </div>
+                    <div>
+                        <h3 style="font-size: 1.2rem; margin-bottom: 5px; text-transform: uppercase;"><?= htmlspecialchars($ann['tieu_de']) ?></h3>
+                        <p style="color: var(--text-muted); font-size: 0.95rem;"><?= htmlspecialchars(mb_substr(strip_tags($ann['noi_dung']), 0, 100)) ?>...</p>
                     </div>
                 </div>
                 <?php endforeach; ?>
-            </div>
             <?php else: ?>
-            <p class="text-center text-muted">Khong co san pham nao co san.</p>
+                <p style="text-align:center; color:var(--text-muted); grid-column: 1/-1;">Hiện chưa có thông báo mới.</p>
             <?php endif; ?>
-            <div style="text-align: center; margin-top: 2rem;">
-                <a href="<?= SITE_URL ?>/member/store" class="btn-shop-all">🏪 Xem Toàn Bộ Sản Phẩm →</a>
-            </div>
         </div>
     </section>
 
-    <!-- CTA -->
-    <section class="cta-section">
-        <div class="section-container" style="text-align:center;">
-            <h2>Sẵn sàng bắt đầu?</h2>
-            <p style="margin: 1rem 0 2rem; color: var(--text-secondary);">Tham gia cộng đồng Monkey Gym ngay hôm nay — miễn phí đăng ký.</p>
-            <a href="<?= SITE_URL ?>/register" class="btn-hero-primary" style="font-size: 1.1rem;">Tạo tài khoản miễn phí →</a>
-        </div>
-    </section>
-
-    <!-- FOOTER -->
-    <footer class="landing-footer">
-        <div class="section-container">
-            <div class="footer-brand">
-                <img src="<?= ASSET_URL ?>/favicon.png" width="30" alt="Logo">
-                <span><strong>Monkey Gym</strong> &copy; <?= date('Y') ?></span>
-            </div>
-            <p style="color: var(--text-secondary); font-size: 0.9rem;">Vượt qua giới hạn, kiến tạo bản thân.</p>
-        </div>
+    <footer style="text-align: center; padding: 4rem 5% 2rem; border-top: 1px solid var(--border);">
+        <div class="nav-logo" style="justify-content: center; margin-bottom: 1rem;">🐵 MONKEY<span>GYM</span></div>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">© 2026 Monkey Gym Fitness Center. Vượt qua giới hạn, kiến tạo bản thân.</p>
     </footer>
 
-    <!-- AI CHATBOT COMPONENT -->
-    <?php require_once __DIR__ . '/components/chatbot.php'; ?>
-
     <script>
-        // Sticky nav on scroll
-        window.addEventListener('scroll', () => {
-            document.getElementById('landingNav').classList.toggle('scrolled', window.scrollY > 50);
-        });
-        // Smooth scroll
-        document.querySelectorAll('a[href^="#"]').forEach(a => {
-            a.addEventListener('click', e => {
-                e.preventDefault();
-                document.querySelector(a.getAttribute('href'))?.scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('formTapThu').addEventListener('submit', function(e) {
+            e.preventDefault(); 
+            
+            const btn = document.getElementById('btnSubmitTrial');
+            const msgBox = document.getElementById('trialMessage');
+            const hoTen = document.getElementById('trialName').value;
+            const sdt = document.getElementById('trialPhone').value;
+            
+            btn.innerHTML = 'Đang xử lý...';
+            btn.disabled = true;
+            
+            const formData = new FormData();
+            formData.append('ho_ten', hoTen);
+            formData.append('sdt', sdt);
+            
+            fetch('<?= SITE_URL ?>/api/dang-ky-tap-thu', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                msgBox.style.display = 'block';
+                if(data.success) {
+                    msgBox.style.color = 'var(--primary)';
+                    msgBox.innerHTML = data.message;
+                    document.getElementById('formTapThu').reset(); 
+                } else {
+                    msgBox.style.color = '#ef4444'; 
+                    msgBox.innerHTML = 'Lỗi: ' + data.message;
+                }
+            })
+            .catch(error => {
+                msgBox.style.display = 'block';
+                msgBox.style.color = '#ef4444';
+                msgBox.innerHTML = 'Đã xảy ra lỗi kết nối mạng.';
+            })
+            .finally(() => {
+                btn.innerHTML = 'Nhận Vé Ngay';
+                btn.disabled = false;
             });
-        });
-
-        // Trainer detail modal
-        function openTrainerModal(el) {
-            const modal = document.getElementById('trainerModal');
-            const name = el.dataset.name;
-            const spec = el.dataset.spec;
-            const exp = parseInt(el.dataset.exp) || 0;
-            const desc = el.dataset.desc;
-            const rating = el.dataset.rating;
-            const reviewCount = parseInt(el.dataset.reviewCount) || 0;
-            const avatar = el.dataset.avatar;
-            let reviews = [];
-            try { reviews = JSON.parse(el.dataset.reviews); } catch(e) {}
-
-            // Avatar
-            const tmAvatar = document.getElementById('tmAvatar');
-            if (avatar) {
-                tmAvatar.innerHTML = `<img src="${avatar}" style="width:100%;height:100%;object-fit:cover;">`;
-            } else {
-                tmAvatar.innerHTML = '👤';
-            }
-
-            document.getElementById('tmName').textContent = name;
-            document.getElementById('tmSpec').textContent = spec;
-
-            const tmExp = document.getElementById('tmExp');
-            if (exp > 0) {
-                tmExp.style.display = '';
-                tmExp.innerHTML = `🏆 ${exp} năm kinh nghiệm`;
-            } else {
-                tmExp.style.display = 'none';
-            }
-
-            // Rating
-            const stars = Math.round(parseFloat(rating));
-            document.getElementById('tmRating').innerHTML =
-                '⭐'.repeat(Math.min(stars, 5)) +
-                ` <span style="color:var(--text-secondary); font-size:0.9rem;">(${rating}) · ${reviewCount} đánh giá</span>`;
-
-            // Description
-            const tmDescBlock = document.getElementById('tmDescBlock');
-            if (desc) {
-                tmDescBlock.style.display = '';
-                document.getElementById('tmDesc').textContent = desc;
-            } else {
-                tmDescBlock.style.display = 'none';
-            }
-
-            // Reviews list
-            const listEl = document.getElementById('tmReviewsList');
-            const noEl = document.getElementById('tmNoReviews');
-            listEl.innerHTML = '';
-            document.getElementById('tmReviewCount').textContent = `(${reviews.length})`;
-
-            if (reviews.length === 0) {
-                noEl.style.display = '';
-            } else {
-                noEl.style.display = 'none';
-                reviews.forEach(r => {
-                    const rStars = '★'.repeat(r.so_sao);
-                    const date = new Date(r.created_at);
-                    const dateStr = date.toLocaleDateString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric' });
-                    const div = document.createElement('div');
-                    div.style.cssText = 'border-bottom:1px solid rgba(255,255,255,0.06); padding:0.8rem 0;';
-                    div.innerHTML = `
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
-                            <strong style="color:white; font-size:0.85rem;">${r.ten_hoi_vien}</strong>
-                            <div style="display:flex; align-items:center; gap:0.5rem;">
-                                <span style="color:#f59e0b; font-size:0.9rem;">${rStars}</span>
-                                <span style="color:var(--text-secondary); font-size:0.75rem;">${dateStr}</span>
-                            </div>
-                        </div>
-                        ${r.noi_dung ? `<p style="color:var(--text-secondary); font-size:0.85rem; margin:0; line-height:1.5;">"${r.noi_dung}"</p>` : ''}
-                    `;
-                    listEl.appendChild(div);
-                });
-            }
-
-            modal.style.display = 'flex';
-        }
-
-        // Close modal on overlay click
-        document.getElementById('trainerModal').addEventListener('click', function(e) {
-            if (e.target === this) this.style.display = 'none';
         });
     </script>
 </body>

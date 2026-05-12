@@ -78,16 +78,13 @@
     </style>
 </head>
 <body>
-<?php require __DIR__ . '/layout/topbar.php'; ?>
-
-<div class="member-content">
-    <div class="container">
-        <div class="header-flex">
-            <div>
-                <h2 class="page-title">Danh sách Học Viên</h2>
-                <p class="text-muted">Quản lý và theo dõi tiến độ của các học viên bạn đang kèm cặp.</p>
-            </div>
-        </div>
+<div class="admin-layout">
+    <?php require __DIR__ . '/layout/thanh-ben.php'; ?>
+    <main class="admin-content">
+        <header style="margin-bottom: 2rem;">
+            <h1 style="font-size: 2.2rem; font-weight: 900;">👥 Danh Sách <span style="color: var(--primary);">Học Viên</span></h1>
+            <p style="color: var(--text-muted);">Quản lý và theo dõi tiến độ của các học viên bạn đang kèm cặp.</p>
+        </header>
 
         <?php if (empty($students)): ?>
             <div class="glass-panel text-center py-5">
@@ -111,9 +108,9 @@
                     <div class="student-card">
                         <div class="student-header">
                             <div>
-                                <div class="student-name"><?= htmlspecialchars($s['ho_ten']) ?></div>
-                                <div class="student-info">📧 <?= htmlspecialchars($s['email']) ?></div>
-                                <div class="student-info">📞 <?= htmlspecialchars($s['so_dien_thoai'] ?: 'Chưa có SĐT') ?></div>
+                                <div class="student-name"><?= htmlspecialchars($s['ho_ten'] ?? '') ?></div>
+                                <div class="student-info">📧 <?= htmlspecialchars($s['email'] ?? '') ?></div>
+                                <div class="student-info">📞 <?= htmlspecialchars($s['so_dien_thoai'] ?? 'Chưa có SĐT') ?></div>
                             </div>
                         </div>
                         
@@ -144,8 +141,7 @@
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
-    </div>
-</div>
-
+    </main>
+</div><!-- .admin-layout -->
 </body>
 </html>

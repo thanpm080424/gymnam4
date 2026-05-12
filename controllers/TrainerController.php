@@ -1,440 +1,455 @@
 <?php
 require_once __DIR__ . '/../utils/Middleware.php';
 
-// Danh sách khung giờ chuẩn của gym
-if (!defined('GYM_TIME_SLOTS')) {
-    define('GYM_TIME_SLOTS', [
-        ['bat_dau' => '05:30:00', 'ket_thuc' => '06:50:00', 'label' => '5h30–6h50'],
-        ['bat_dau' => '07:00:00', 'ket_thuc' => '08:20:00', 'label' => '7h00–8h20'],
-        ['bat_dau' => '08:30:00', 'ket_thuc' => '09:50:00', 'label' => '8h30–9h50'],
-        ['bat_dau' => '10:00:00', 'ket_thuc' => '11:20:00', 'label' => '10h00–11h20'],
-        ['bat_dau' => '11:30:00', 'ket_thuc' => '13:30:00', 'label' => '🔸 11h30–13h30 (NGHỈ)', 'is_break' => true],
-        ['bat_dau' => '13:30:00', 'ket_thuc' => '14:50:00', 'label' => '13h30–14h50'],
-        ['bat_dau' => '15:00:00', 'ket_thuc' => '16:20:00', 'label' => '15h00–16h20'],
-        ['bat_dau' => '17:00:00', 'ket_thuc' => '18:20:00', 'label' => '17h00–18h20'],
-        ['bat_dau' => '18:30:00', 'ket_thuc' => '19:50:00', 'label' => '18h30–19h50'],
-        ['bat_dau' => '20:00:00', 'ket_thuc' => '21:20:00', 'label' => '20h00–21h20'],
-    ]);
-}
-
 class TrainerController {
     public function __construct() {
-        if (session_status() === PHP_SESSION_NONE) session_start();
-        $role = $_SESSION['role'] ?? $_SESSION['vai_tro'] ?? '';
-        if (!isset($_SESSION['user_id']) || $role !== 'hlv') {
-            header("Location: " . SITE_URL . "/login");
-            exit;
-        }
+        Middleware::checkTrainer();
     }
 
     public function dashboard() {
         require_once __DIR__ . '/../database/config.php';
         $db = Database::getConnection();
         $userId = $_SESSION['user_id'];
-        
-        $stmtT = $db->prepare("SELECT ma_hlv, chuyen_mon FROM HUAN_LUYEN_VIEN WHERE ma_nguoi_dung = ?");
-        $stmtT->execute([$userId]);
-        $trainer = $stmtT->fetch();
 
-        $stmtB = $db->prepare("
-            SELECT l.*, COALESCE(u.ho_ten, u.ten_dang_nhap) as ho_ten, u.ten_dang_nhap, h.chieu_cao, h.can_nang
-            FROM LICH_DAT_PT l
-            JOIN HOI_VIEN h ON l.ma_hoi_vien = h.ma_hoi_vien
-            JOIN NGUOI_DUNG u ON h.ma_nguoi_dung = u.ma_nguoi_dung
-            WHERE l.ma_hlv = ?
-            ORDER BY CASE WHEN l.trang_thai IN ('pending', 'cancel_requested') THEN 1 ELSE 2 END, l.ngay_gio_tap DESC
-        ");
-        $stmtB->execute([$trainer['ma_hlv']]);
-        $bookings = $stmtB->fetchAll();
+        // 1. Lấy thông tin HLV
+        $stmtH = $db->prepare("SELECT * FROM HUAN_LUYEN_VIEN WHERE ma_nguoi_dung = ?");
+        $stmtH->execute([$userId]);
+        $trainer = $stmtH->fetch();
+        $ma_hlv = $trainer['ma_hlv'] ?? 0;
 
-        require __DIR__ . '/../views/trainer/bang-dieu-khien.php';
-    }
-
-    public function students() {
-        require_once __DIR__ . '/../database/config.php';
-        $db = Database::getConnection();
-        $userId = $_SESSION['user_id'];
-
-        $stmtT = $db->prepare("SELECT ma_hlv FROM HUAN_LUYEN_VIEN WHERE ma_nguoi_dung = ?");
-        $stmtT->execute([$userId]);
-        $trainer = $stmtT->fetch();
-
-        if (!$trainer) {
-            header("Location: " . SITE_URL . "/login"); exit;
-        }
-
-        // Lấy danh sách học viên duy nhất đã từng đặt lịch hoặc đang học với HLV này
+        // 2. Lấy lịch dạy LỚP NHÓM sắp tới
         $stmtS = $db->prepare("
-            SELECT DISTINCT h.ma_hoi_vien, COALESCE(u.ho_ten, u.ten_dang_nhap) as ho_ten, u.email, u.so_dien_thoai,
-                   h.chieu_cao, h.can_nang, h.so_buoi_pt_con_lai,
-                   (SELECT COUNT(*) FROM LICH_DAT_PT WHERE ma_hoi_vien = h.ma_hoi_vien AND ma_hlv = ? AND trang_thai = 'attended') as so_buoi_da_tap
-            FROM LICH_DAT_PT l
-            JOIN HOI_VIEN h ON l.ma_hoi_vien = h.ma_hoi_vien
-            JOIN NGUOI_DUNG u ON h.ma_nguoi_dung = u.ma_nguoi_dung
-            WHERE l.ma_hlv = ?
-            ORDER BY u.ho_ten ASC
+            SELECT lh.*, l.ten_lop, l.hinh_anh, l.loai_lop
+            FROM LICH_HOC_NHOM lh
+            JOIN LOP_HOC_NHOM l ON lh.ma_lop = l.ma_lop
+            WHERE lh.ma_hlv = ? AND lh.ngay_hoc >= CURDATE()
+            ORDER BY lh.ngay_hoc ASC, lh.gio_bat_dau ASC
         ");
-        $stmtS->execute([$trainer['ma_hlv'], $trainer['ma_hlv']]);
-        $students = $stmtS->fetchAll();
+        $stmtS->execute([$ma_hlv]);
+        $schedules = $stmtS->fetchAll();
 
-        require __DIR__ . '/../views/trainer/hoc-vien.php';
+        // 3. Lấy lịch đặt PT cá nhân từ hội viên
+        $stmtPT = $db->prepare("
+            SELECT l.*, u.ho_ten, u.ten_dang_nhap,
+                   DATE(l.ngay_gio_tap) as ngay_tap,
+                   TIME(l.ngay_gio_tap) as gio_tap
+            FROM LICH_DAT_PT l
+            JOIN HOI_VIEN hv ON l.ma_hoi_vien = hv.ma_hoi_vien
+            JOIN NGUOI_DUNG u ON hv.ma_nguoi_dung = u.ma_nguoi_dung
+            WHERE l.ma_hlv = ? AND DATE(l.ngay_gio_tap) >= CURDATE()
+              AND l.trang_thai IN ('pending', 'confirmed')
+            ORDER BY l.ngay_gio_tap ASC
+        ");
+        $stmtPT->execute([$ma_hlv]);
+        $ptBookings = $stmtPT->fetchAll();
+
+        // 4. Tính toán thu nhập dự kiến tháng này (group + PT)
+        $stmtP = $db->prepare("
+            SELECT COUNT(*) as so_buoi 
+            FROM LICH_HOC_NHOM 
+            WHERE ma_hlv = ? AND MONTH(ngay_hoc) = MONTH(CURDATE()) AND YEAR(ngay_hoc) = YEAR(CURDATE())
+        ");
+        $stmtP->execute([$ma_hlv]);
+        $so_buoi_nhom = $stmtP->fetch()['so_buoi'] ?? 0;
+
+        $stmtPTCount = $db->prepare("
+            SELECT COUNT(*) as so_buoi 
+            FROM LICH_DAT_PT 
+            WHERE ma_hlv = ? AND MONTH(ngay_gio_tap) = MONTH(CURDATE()) AND YEAR(ngay_gio_tap) = YEAR(CURDATE())
+              AND trang_thai IN ('pending', 'confirmed', 'cancel_rejected')
+        ");
+        $stmtPTCount->execute([$ma_hlv]);
+        $so_buoi_pt = $stmtPTCount->fetch()['so_buoi'] ?? 0;
+
+        $so_buoi = $so_buoi_nhom + $so_buoi_pt;
+        
+        $luong_cung = $trainer['luong_cung'] ?? 5000000;
+        $gia_buoi = $trainer['gia_buoi_day'] ?? 150000;
+        $du_kien = $luong_cung + ($so_buoi * $gia_buoi);
+
+        // 5. Đánh giá trung bình
+        $stmtAvg = $db->prepare("SELECT AVG(so_sao) as avg_star FROM DANH_GIA_HLV WHERE ma_hlv = ? AND trang_thai = 'approved'");
+        $stmtAvg->execute([$ma_hlv]);
+        $avgStar = round($stmtAvg->fetchColumn() ?: 0, 1);
+
+        require __DIR__ . '/../views/trainer/dashboard.php';
     }
 
-    public function resolveBooking() {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            require_once __DIR__ . '/../database/config.php';
-            $db = Database::getConnection();
-            $action = $_POST['action'];
-            $maLich = $_POST['ma_lich'];
-            
-            // Lấy thông tin lịch + khách
-            $stmtL = $db->prepare("SELECT ma_hoi_vien, trang_thai FROM LICH_DAT_PT WHERE ma_lich = ?");
-            $stmtL->execute([$maLich]);
-            $lich = $stmtL->fetch();
-
-            if ($lich['trang_thai'] === 'pending') {
-                if ($action === 'accept') {
-                    $db->beginTransaction();
-                    $db->prepare("UPDATE LICH_DAT_PT SET trang_thai = 'confirmed' WHERE ma_lich = ?")->execute([$maLich]);
-                    
-                    // Reject other pending requests for the same slot
-                    $stmtSlot = $db->prepare("SELECT ma_hlv, ngay_gio_tap FROM LICH_DAT_PT WHERE ma_lich = ?");
-                    $stmtSlot->execute([$maLich]);
-                    $slot = $stmtSlot->fetch();
-                    
-                    $stmtOthers = $db->prepare("SELECT ma_lich, ma_hoi_vien FROM LICH_DAT_PT WHERE ma_hlv = ? AND ngay_gio_tap = ? AND trang_thai = 'pending' AND ma_lich != ?");
-                    $stmtOthers->execute([$slot['ma_hlv'], $slot['ngay_gio_tap'], $maLich]);
-                    $others = $stmtOthers->fetchAll();
-                    
-                    foreach($others as $other) {
-                        $db->prepare("UPDATE LICH_DAT_PT SET trang_thai = 'cancelled', ly_do_huy = 'HLV đã nhận học viên khác' WHERE ma_lich = ?")->execute([$other['ma_lich']]);
-                        $db->prepare("UPDATE HOI_VIEN SET so_buoi_pt_con_lai = so_buoi_pt_con_lai + 1 WHERE ma_hoi_vien = ?")->execute([$other['ma_hoi_vien']]);
-                    }
-                    
-                    $db->commit();
-                    $msg = "Đã nhận lịch hẹn báo với học viên.";
-                } elseif ($action === 'reject') {
-                    $db->beginTransaction();
-                    $db->prepare("UPDATE LICH_DAT_PT SET trang_thai = 'cancelled' WHERE ma_lich = ?")->execute([$maLich]);
-                    // Refund 1 PT session
-                    $db->prepare("UPDATE HOI_VIEN SET so_buoi_pt_con_lai = so_buoi_pt_con_lai + 1 WHERE ma_hoi_vien = ?")->execute([$lich['ma_hoi_vien']]);
-                    $db->commit();
-                    $msg = "Đã từ chối lịch và hoàn trả buổi PT cho học viên.";
-                }
-            }
-            
-            header("Location: " . SITE_URL . "/trainer/dashboard?msg=" . urlencode($msg ?? "Thao tac thanh cong."));
-        }
-    }
-
-    public function resolveCancel() {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            require_once __DIR__ . '/../database/config.php';
-            $db = Database::getConnection();
-            $action = $_POST['action'];
-            $maLich = $_POST['ma_lich'];
-
-            $stmtL = $db->prepare("SELECT ma_hoi_vien, trang_thai FROM LICH_DAT_PT WHERE ma_lich = ?");
-            $stmtL->execute([$maLich]);
-            $lich = $stmtL->fetch();
-
-            if ($lich['trang_thai'] === 'cancel_requested') {
-                if ($action === 'accept_cancel') {
-                    $db->beginTransaction();
-                    $db->prepare("UPDATE LICH_DAT_PT SET trang_thai = 'cancelled' WHERE ma_lich = ?")->execute([$maLich]);
-                    // Refund 1 PT session because cancel is accepted
-                    $db->prepare("UPDATE HOI_VIEN SET so_buoi_pt_con_lai = so_buoi_pt_con_lai + 1 WHERE ma_hoi_vien = ?")->execute([$lich['ma_hoi_vien']]);
-                    $db->commit();
-                    $msg = "Đã chấp nhận đơn xin huỷ. Buổi tập đã hoàn lại cho khách.";
-                } elseif ($action === 'reject_cancel') {
-                    $db->prepare("UPDATE LICH_DAT_PT SET trang_thai = 'cancel_rejected' WHERE ma_lich = ?")->execute([$maLich]);
-                    $msg = "Đã BÁC BỎ lý do huỷ của khách. Khách hàng BỊ TRỪ buổi tập này.";
-                }
-            }
-            header("Location: " . SITE_URL . "/trainer/dashboard?msg=" . urlencode($msg ?? "Da xu ly xong."));
-        }
-    }
-
-    // ============================================================
-    // HỒ SƠ CÁ NHÂN HLV
-    // ============================================================
-    public function profile() {
+    public function myPayroll() {
         require_once __DIR__ . '/../database/config.php';
         $db = Database::getConnection();
         $userId = $_SESSION['user_id'];
 
-        $stmtT = $db->prepare("
-            SELECT t.*, u.ten_dang_nhap, u.ho_ten FROM HUAN_LUYEN_VIEN t
-            JOIN NGUOI_DUNG u ON t.ma_nguoi_dung = u.ma_nguoi_dung
-            WHERE t.ma_nguoi_dung = ?
+        $stmtH = $db->prepare("SELECT ma_hlv FROM HUAN_LUYEN_VIEN WHERE ma_nguoi_dung = ?");
+        $stmtH->execute([$userId]);
+        $ma_hlv = $stmtH->fetchColumn();
+
+        // Lấy lịch sử bảng lương
+        $stmtPay = $db->prepare("
+            SELECT * FROM BANG_LUONG 
+            WHERE ma_hlv = ? 
+            ORDER BY ma_luong DESC
         ");
-        $stmtT->execute([$userId]);
-        $trainer = $stmtT->fetch();
+        $stmtPay->execute([$ma_hlv]);
+        $payrolls = $stmtPay->fetchAll();
 
-        $stmtR = $db->prepare("
-            SELECT r.*, u.ten_dang_nhap as ten_hoi_vien FROM DANH_GIA_HLV r
-            JOIN HOI_VIEN hv ON r.ma_hoi_vien = hv.ma_hoi_vien
-            JOIN NGUOI_DUNG u ON hv.ma_nguoi_dung = u.ma_nguoi_dung
-            WHERE r.ma_hlv = ? AND r.trang_thai = 'approved'
-            ORDER BY r.created_at DESC
-        ");
-        $stmtR->execute([$trainer['ma_hlv']]);
-        $reviews = $stmtR->fetchAll();
-
-        $stmtAvg = $db->prepare("SELECT AVG(so_sao) as avg, COUNT(*) as cnt FROM DANH_GIA_HLV WHERE ma_hlv = ? AND trang_thai = 'approved'");
-        $stmtAvg->execute([$trainer['ma_hlv']]);
-        $ratingInfo = $stmtAvg->fetch();
-        $avgRating = $ratingInfo['avg'];
-        $reviewCount = $ratingInfo['cnt'];
-
-        require __DIR__ . '/../views/trainer/ho-so.php';
+        require __DIR__ . '/../views/trainer/lich-su-luong.php';
     }
-
-    public function updateProfile() {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            require_once __DIR__ . '/../database/config.php';
-            $db = Database::getConnection();
-            $userId = $_SESSION['user_id'];
-
-            $stmtT = $db->prepare("SELECT ma_hlv, anh_dai_dien FROM HUAN_LUYEN_VIEN WHERE ma_nguoi_dung = ?");
-            $stmtT->execute([$userId]);
-            $trainer = $stmtT->fetch();
-
-            $anhDaiDien = $trainer['anh_dai_dien'];
-            if (isset($_FILES['anh_dai_dien']) && $_FILES['anh_dai_dien']['error'] == 0) {
-                $uploadDir = __DIR__ . '/../public/uploads/trainers/';
-                if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
-                $ext = pathinfo($_FILES['anh_dai_dien']['name'], PATHINFO_EXTENSION);
-                $anhDaiDien = '/uploads/trainers/' . uniqid() . '.' . $ext;
-                move_uploaded_file($_FILES['anh_dai_dien']['tmp_name'], __DIR__ . '/../public' . $anhDaiDien);
-            }
-
-            $db->prepare("UPDATE HUAN_LUYEN_VIEN SET chuyen_mon=?, nam_kinh_nghiem=?, gioi_thieu=?, anh_dai_dien=? WHERE ma_hlv=?")
-               ->execute([$_POST['chuyen_mon'], $_POST['nam_kinh_nghiem'], $_POST['gioi_thieu'], $anhDaiDien, $trainer['ma_hlv']]);
-
-            // Cập nhật họ tên trong bảng NGUOI_DUNG
-            $hoTen = trim($_POST['ho_ten'] ?? '');
-            if ($hoTen !== '') {
-                $db->prepare("UPDATE NGUOI_DUNG SET ho_ten=? WHERE ma_nguoi_dung=?")
-                   ->execute([$hoTen, $userId]);
-            }
-
-            header("Location: " . SITE_URL . "/trainer/profile?msg=" . urlencode("Da cap nhat ho so!"));
-        }
-    }
-
-    public function saveNote() {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            require_once __DIR__ . '/../database/config.php';
-            $db = Database::getConnection();
-            $userId = $_SESSION['user_id'];
-
-            $stmtT = $db->prepare("SELECT ma_hlv FROM HUAN_LUYEN_VIEN WHERE ma_nguoi_dung = ?");
-            $stmtT->execute([$userId]);
-            $maHlv = $stmtT->fetchColumn();
-
-            $db->prepare("INSERT INTO GHI_CHU_HLV (ma_hlv, ma_hoi_vien, noi_dung) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE noi_dung=?")
-               ->execute([$maHlv, $_POST['ma_hoi_vien'], $_POST['noi_dung'], $_POST['noi_dung']]);
-
-            header("Location: " . SITE_URL . "/trainer/dashboard?msg=" . urlencode("Da luu ghi chu."));
-        }
-    }
-
-    public function reportReview() {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            require_once __DIR__ . '/../database/config.php';
-            $db = Database::getConnection();
-            $db->prepare("UPDATE DANH_GIA_HLV SET trang_thai='reported' WHERE ma_dg=?")
-               ->execute([$_POST['ma_dg']]);
-            header("Location: " . SITE_URL . "/trainer/profile?msg=" . urlencode("Da bao cao bai danh gia. Staff se xem xet."));
-        }
-    }
-
-    // ============================================================
-    // THỜI KHÓA BIỂU HLV
-    // ============================================================
 
     /**
-     * GET /trainer/schedule
-     * HLV xem & quản lý thời khóa biểu tuần của mình
-     * ?week=0 (tuần này), ?week=-1 (tuần trước), ?week=1 (tuần sau)
+     * API: Trả về lịch đã đặt của HLV (dùng cho trang đặt lịch PT của member)
+     * Static vì member cũng gọi được (không qua middleware checkTrainer)
+     */
+    public static function getScheduleApi() {
+        header('Content-Type: application/json');
+        require_once __DIR__ . '/../database/config.php';
+        $db = Database::getConnection();
+
+        $ma_hlv = (int)($_GET['ma_hlv'] ?? 0);
+        if (!$ma_hlv) {
+            echo json_encode(['bookings' => []]);
+            return;
+        }
+
+        // Lấy các lịch đã được xác nhận/đang chờ của HLV (14 ngày tới)
+        $stmt = $db->prepare("
+            SELECT DATE(ngay_gio_tap) as booking_date, 
+                   DATE_FORMAT(ngay_gio_tap, '%H:%i') as booking_time
+            FROM LICH_DAT_PT 
+            WHERE ma_hlv = ? 
+              AND ngay_gio_tap >= CURDATE()
+              AND trang_thai IN ('pending', 'confirmed', 'cancel_rejected')
+            ORDER BY ngay_gio_tap ASC
+        ");
+        $stmt->execute([$ma_hlv]);
+        $bookings = $stmt->fetchAll();
+
+        echo json_encode(['bookings' => $bookings]);
+    }
+
+    /**
+     * View: Thời Khóa Biểu Tuần (Tự động từ LICH_DAT_PT)
      */
     public function schedule() {
         require_once __DIR__ . '/../database/config.php';
         $db = Database::getConnection();
         $userId = $_SESSION['user_id'];
 
-        $stmtT = $db->prepare("SELECT ma_hlv, chuyen_mon FROM HUAN_LUYEN_VIEN WHERE ma_nguoi_dung = ?");
-        $stmtT->execute([$userId]);
-        $trainer = $stmtT->fetch();
-        if (!$trainer) { header("Location: " . SITE_URL . "/trainer/dashboard"); exit; }
+        // 1. Lấy ma_hlv
+        $stmtH = $db->prepare("SELECT ma_hlv FROM HUAN_LUYEN_VIEN WHERE ma_nguoi_dung = ?");
+        $stmtH->execute([$userId]);
+        $ma_hlv = $stmtH->fetchColumn();
 
-        $weekOffset = (int)($_GET['week'] ?? 0);
+        // 2. Xử lý tuần (Week Offset)
+        $weekOffset = isset($_GET['week']) ? (int)$_GET['week'] : 0;
+        
+        // Tìm ngày Thứ 2 của tuần được chọn
         $monday = new DateTime();
-        $monday->modify('monday this week');
-        $monday->modify($weekOffset . ' weeks');
-        $sunday = clone $monday;
-        $sunday->modify('+6 days');
+        $monday->setISODate((int)date('Y'), (int)date('W')); 
+        if ($weekOffset != 0) {
+            $monday->modify(($weekOffset * 7) . " days");
+        }
+        
+        $startDate = $monday->format('Y-m-d');
+        $endDate = clone $monday;
+        $endDate->modify('+6 days');
+        $endDateStr = $endDate->format('Y-m-d');
 
+        $weekLabel = "Tuần " . $monday->format('d/m') . " - " . $endDate->format('d/m/Y');
+
+        // 3. Tạo mảng các ngày trong tuần (Header)
         $weekDays = [];
+        $tempDate = clone $monday;
+        $thuVn = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
         for ($i = 0; $i < 7; $i++) {
-            $d = clone $monday;
-            $d->modify("$i days");
+            $dateStr = $tempDate->format('Y-m-d');
             $weekDays[] = [
-                'date'   => $d->format('Y-m-d'),
-                'label'  => $d->format('d/m'),
-                'thu_vn' => ['', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'][(int)$d->format('N')],
-                'is_today' => ($d->format('Y-m-d') === date('Y-m-d')),
+                'date'     => $dateStr,
+                'label'    => $tempDate->format('d/m'),
+                'thu_vn'   => $thuVn[$i],
+                'is_today' => ($dateStr === date('Y-m-d'))
             ];
+            $tempDate->modify('+1 day');
         }
 
-        // TKB = tất cả lịch hẹn thực tế trong tuần (tự động, không cần nhập thủ công)
-        $stmtB = $db->prepare("
-            SELECT l.ma_lich, l.ngay_gio_tap, l.loai_pt, l.ghi_chu, l.trang_thai,
-                   DATE(l.ngay_gio_tap) as ngay,
-                   TIME_FORMAT(l.ngay_gio_tap, '%H:%i') as gio_hien,
-                   COALESCE(u.ho_ten, u.ten_dang_nhap) as ten_hoi_vien
+        // 4. Lấy khung giờ từ config (GYM_TIME_SLOTS)
+        // Chuyển đổi sang format view cần
+        $timeSlots = [];
+        if (defined('GYM_TIME_SLOTS')) {
+            foreach (GYM_TIME_SLOTS as $slot) {
+                $timeSlots[] = [
+                    'label'    => substr($slot['bat_dau'], 0, 5) . ' - ' . substr($slot['ket_thuc'], 0, 5),
+                    'bat_dau'  => $slot['bat_dau'],
+                    'ket_thuc' => $slot['ket_thuc'],
+                    'is_break' => $slot['is_break'] ?? false
+                ];
+            }
+        }
+
+        // 5. Lấy danh sách lịch đặt PT (LICH_DAT_PT)
+        $stmtPT = $db->prepare("
+            SELECT l.*, u.ho_ten as ten_hoi_vien,
+                   DATE_FORMAT(l.ngay_gio_tap, '%H:%i') as gio_hien,
+                   'PT' as kieu_lich
             FROM LICH_DAT_PT l
-            JOIN HOI_VIEN h ON l.ma_hoi_vien = h.ma_hoi_vien
-            JOIN NGUOI_DUNG u ON h.ma_nguoi_dung = u.ma_nguoi_dung
-            WHERE l.ma_hlv = ?
-            AND l.ngay_gio_tap BETWEEN ? AND ?
-            AND l.trang_thai NOT IN ('cancelled', 'cancel_rejected')
+            JOIN HOI_VIEN hv ON l.ma_hoi_vien = hv.ma_hoi_vien
+            JOIN NGUOI_DUNG u ON hv.ma_nguoi_dung = u.ma_nguoi_dung
+            WHERE l.ma_hlv = ? 
+              AND l.ngay_gio_tap >= ? 
+              AND l.ngay_gio_tap <= ?
             ORDER BY l.ngay_gio_tap ASC
         ");
-        $stmtB->execute([
-            $trainer['ma_hlv'],
-            $monday->format('Y-m-d') . ' 00:00:00',
-            $sunday->format('Y-m-d') . ' 23:59:59'
-        ]);
-        $rawBookings = $stmtB->fetchAll();
+        $stmtPT->execute([$ma_hlv, $startDate . ' 00:00:00', $endDateStr . ' 23:59:59']);
+        $ptBookings = $stmtPT->fetchAll();
 
-        // Gom nhóm theo ngày: $bookingByDate['2026-04-25'] = [booking1, booking2, ...]
+        // 6. Lấy lịch dạy lớp nhóm (LICH_HOC_NHOM)
+        $stmtS = $db->prepare("
+            SELECT lh.*, l.ten_lop as ten_hoi_vien, 
+                   CONCAT(lh.ngay_hoc, ' ', lh.gio_bat_dau) as ngay_gio_tap,
+                   DATE_FORMAT(CONCAT(lh.ngay_hoc, ' ', lh.gio_bat_dau), '%H:%i') as gio_hien,
+                   'GROUP' as kieu_lich,
+                   'confirmed' as trang_thai,
+                   l.loai_lop as ghi_chu
+            FROM LICH_HOC_NHOM lh
+            JOIN LOP_HOC_NHOM l ON lh.ma_lop = l.ma_lop
+            WHERE lh.ma_hlv = ? 
+              AND lh.ngay_hoc >= ? 
+              AND lh.ngay_hoc <= ?
+        ");
+        $stmtS->execute([$ma_hlv, $startDate, $endDateStr]);
+        $groupBookings = $stmtS->fetchAll();
+
+        // 7. Gộp và Nhóm theo ngày
+        $allBookings = array_merge($ptBookings, $groupBookings);
         $bookingByDate = [];
-        foreach ($rawBookings as $b) {
-            $bookingByDate[$b['ngay']][] = $b;
+        foreach ($allBookings as $b) {
+            $date = isset($b['ngay_gio_tap']) ? substr($b['ngay_gio_tap'], 0, 10) : $b['ngay_hoc'];
+            $bookingByDate[$date][] = $b;
         }
-
-        $timeSlots = GYM_TIME_SLOTS;
-        $weekLabel = 'Tuần ' . $monday->format('d/m') . ' – ' . $sunday->format('d/m/Y');
 
         require __DIR__ . '/../views/trainer/lich-day.php';
     }
 
     /**
-     * POST /trainer/schedule/update
-     * HLV thêm hoặc cập nhật 1 slot vào thời khóa biểu
-     */
-    public function scheduleUpdate() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header("Location: " . SITE_URL . "/trainer/schedule"); exit;
-        }
-        require_once __DIR__ . '/../database/config.php';
-        $db = Database::getConnection();
-        $userId = $_SESSION['user_id'];
-
-        $stmtT = $db->prepare("SELECT ma_hlv FROM HUAN_LUYEN_VIEN WHERE ma_nguoi_dung = ?");
-        $stmtT->execute([$userId]);
-        $maHlv = $stmtT->fetchColumn();
-
-        $ngayTrongTuan = (int)$_POST['ngay_trong_tuan'];  // 0=CN..6=T7
-        $gioBatDau     = $_POST['gio_bat_dau'];
-        $gioKetThuc    = $_POST['gio_ket_thuc'];
-        $mucTieu       = trim($_POST['muc_tieu'] ?? '');
-        $trangThai     = in_array($_POST['trang_thai'] ?? '', ['trong', 'da_dat']) ? $_POST['trang_thai'] : 'trong';
-        $maLlv         = !empty($_POST['ma_llv']) ? (int)$_POST['ma_llv'] : null;
-
-        if ($maLlv) {
-            // Cập nhật slot đã tồn tại
-            $db->prepare("
-                UPDATE lich_lam_viec_hlv
-                SET ngay_trong_tuan=?, gio_bat_dau=?, gio_ket_thuc=?, muc_tieu=?, trang_thai=?
-                WHERE ma_llv=? AND ma_hlv=?
-            ")->execute([$ngayTrongTuan, $gioBatDau, $gioKetThuc, $mucTieu, $trangThai, $maLlv, $maHlv]);
-        } else {
-            // Thêm slot mới (INSERT hoặc cập nhật nếu trùng)
-            $db->prepare("
-                INSERT INTO lich_lam_viec_hlv (ma_hlv, ngay_trong_tuan, gio_bat_dau, gio_ket_thuc, muc_tieu, trang_thai)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE gio_ket_thuc=VALUES(gio_ket_thuc), muc_tieu=VALUES(muc_tieu), trang_thai=VALUES(trang_thai)
-            ")->execute([$maHlv, $ngayTrongTuan, $gioBatDau, $gioKetThuc, $mucTieu, $trangThai]);
-        }
-
-        $week = (int)($_POST['week_offset'] ?? 0);
-        header("Location: " . SITE_URL . "/trainer/schedule?week=$week&msg=" . urlencode("Da luu slot lich day!"));
-        exit;
-    }
-
-    /**
-     * POST /trainer/schedule/delete
-     * HLV xóa 1 slot khỏi thời khóa biểu
+     * Chức năng: Xóa/Hủy lịch PT
      */
     public function scheduleDeleteSlot() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header("Location: " . SITE_URL . "/trainer/schedule"); exit;
+        require_once __DIR__ . '/../database/config.php';
+        $db = Database::getConnection();
+        $userId = $_SESSION['user_id'];
+        $ma_lich = (int)($_GET['id'] ?? 0);
+
+        if (!$ma_lich) {
+            header('Location: ' . SITE_URL . '/trainer/schedule?msg=ID không hợp lệ');
+            return;
         }
+
+        // Lấy ma_hlv để bảo mật (chỉ xóa lịch của mình)
+        $stmtH = $db->prepare("SELECT ma_hlv FROM HUAN_LUYEN_VIEN WHERE ma_nguoi_dung = ?");
+        $stmtH->execute([$userId]);
+        $ma_hlv = $stmtH->fetchColumn();
+
+        // Cập nhật trạng thái thành 'cancelled' thay vì xóa cứng (để lưu vết)
+        $stmt = $db->prepare("UPDATE LICH_DAT_PT SET trang_thai = 'cancelled' WHERE ma_lich = ? AND ma_hlv = ?");
+        $stmt->execute([$ma_lich, $ma_hlv]);
+
+        header('Location: ' . SITE_URL . '/trainer/schedule?msg=Đã hủy lịch hẹn thành công');
+    }
+
+    /**
+     * Chức năng: Chấp nhận hoặc Từ chối lịch hẹn từ TKB
+     */
+    public function scheduleResolve() {
+        require_once __DIR__ . '/../database/config.php';
+        $db = Database::getConnection();
+        $userId = $_SESSION['user_id'];
+        $ma_lich = (int)($_GET['id'] ?? 0);
+        $action = $_GET['action'] ?? ''; // 'confirm' hoặc 'cancel'
+
+        if (!$ma_lich || !in_array($action, ['confirm', 'cancel'])) {
+            header('Location: ' . SITE_URL . '/trainer/schedule?msg=Yêu cầu không hợp lệ');
+            return;
+        }
+
+        // Lấy ma_hlv để bảo mật
+        $stmtH = $db->prepare("SELECT ma_hlv FROM HUAN_LUYEN_VIEN WHERE ma_nguoi_dung = ?");
+        $stmtH->execute([$userId]);
+        $ma_hlv = $stmtH->fetchColumn();
+
+        if ($action === 'confirm') {
+            $stmt = $db->prepare("UPDATE LICH_DAT_PT SET trang_thai = 'confirmed' WHERE ma_lich = ? AND ma_hlv = ?");
+            $msg = "Đã xác nhận lịch hẹn";
+            $stmt->execute([$ma_lich, $ma_hlv]);
+        } else {
+            // Khi HLV hủy hoặc từ chối -> Phải hoàn lại buổi tập cho hội viên
+            $db->beginTransaction();
+            try {
+                // 1. Lấy ma_hoi_vien của lịch này
+                $stmtGet = $db->prepare("SELECT ma_hoi_vien FROM LICH_DAT_PT WHERE ma_lich = ? AND ma_hlv = ?");
+                $stmtGet->execute([$ma_lich, $ma_hlv]);
+                $ma_hv = $stmtGet->fetchColumn();
+
+                if ($ma_hv) {
+                    // 2. Cập nhật trạng thái và lý do hủy
+                    $stmt = $db->prepare("UPDATE LICH_DAT_PT SET trang_thai = 'cancelled', ly_do_huy = 'HLV báo bận' WHERE ma_lich = ? AND ma_hlv = ?");
+                    $stmt->execute([$ma_lich, $ma_hlv]);
+
+                    // 3. Hoàn lại 1 buổi PT cho hội viên
+                    $db->prepare("UPDATE HOI_VIEN SET so_buoi_pt_con_lai = so_buoi_pt_con_lai + 1 WHERE ma_hoi_vien = ?")
+                       ->execute([$ma_hv]);
+                    
+                    $db->commit();
+                    $msg = "Đã hủy/từ chối lịch hẹn và hoàn lại 1 buổi tập cho hội viên";
+                } else {
+                    $db->rollBack();
+                    $msg = "Không tìm thấy thông tin lịch hẹn để hủy";
+                }
+            } catch (Exception $e) {
+                $db->rollBack();
+                $msg = "Lỗi khi xử lý hủy lịch: " . $e->getMessage();
+            }
+        }
+        header('Location: ' . SITE_URL . '/trainer/schedule?msg=' . urlencode($msg));
+    }
+
+    /**
+     * View: Danh sách học viên của HLV
+     */
+    public function students() {
         require_once __DIR__ . '/../database/config.php';
         $db = Database::getConnection();
         $userId = $_SESSION['user_id'];
 
-        $stmtT = $db->prepare("SELECT ma_hlv FROM HUAN_LUYEN_VIEN WHERE ma_nguoi_dung = ?");
-        $stmtT->execute([$userId]);
-        $maHlv = $stmtT->fetchColumn();
+        $stmtH = $db->prepare("SELECT ma_hlv FROM HUAN_LUYEN_VIEN WHERE ma_nguoi_dung = ?");
+        $stmtH->execute([$userId]);
+        $ma_hlv = $stmtH->fetchColumn();
 
-        $maLlv = (int)($_POST['ma_llv'] ?? 0);
-        if ($maLlv) {
-            $db->prepare("DELETE FROM lich_lam_viec_hlv WHERE ma_llv = ? AND ma_hlv = ?")
-               ->execute([$maLlv, $maHlv]);
-        }
+        // Lấy danh sách học viên (hội viên có ít nhất 1 lịch đặt với HLV này)
+        $stmtS = $db->prepare("
+            SELECT DISTINCT hv.*, u.ho_ten, u.email, u.so_dien_thoai,
+                   (SELECT COUNT(*) FROM LICH_DAT_PT WHERE ma_hoi_vien = hv.ma_hoi_vien AND ma_hlv = ? AND trang_thai = 'completed') as so_buoi_da_tap
+            FROM HOI_VIEN hv
+            JOIN NGUOI_DUNG u ON hv.ma_nguoi_dung = u.ma_nguoi_dung
+            JOIN LICH_DAT_PT l ON hv.ma_hoi_vien = l.ma_hoi_vien
+            WHERE l.ma_hlv = ?
+        ");
+        $stmtS->execute([$ma_hlv, $ma_hlv]);
+        $students = $stmtS->fetchAll();
 
-        $week = (int)($_POST['week_offset'] ?? 0);
-        header("Location: " . SITE_URL . "/trainer/schedule?week=$week&msg=" . urlencode("Da xoa slot."));
-        exit;
+        require __DIR__ . '/../views/trainer/hoc-vien.php';
     }
 
     /**
-     * GET /trainer/schedule/api?ma_hlv=X
-     * API JSON công khai (không yêu cầu đăng nhập HLV) — cho hội viên xem lịch
-     * Gọi từ member booking page
+     * View: Thông tin cá nhân HLV & Đánh giá
      */
-    public static function getScheduleApi() {
-        header('Content-Type: application/json; charset=utf-8');
+    public function profile() {
         require_once __DIR__ . '/../database/config.php';
         $db = Database::getConnection();
+        $userId = $_SESSION['user_id'];
 
-        $maHlv = (int)($_GET['ma_hlv'] ?? 0);
-        if (!$maHlv) { echo json_encode(['error' => 'Thi\u1ebfu ma_hlv']); exit; }
+        $stmtH = $db->prepare("SELECT h.*, u.ten_dang_nhap, u.ho_ten FROM HUAN_LUYEN_VIEN h JOIN NGUOI_DUNG u ON h.ma_nguoi_dung = u.ma_nguoi_dung WHERE h.ma_nguoi_dung = ?");
+        $stmtH->execute([$userId]);
+        $trainer = $stmtH->fetch();
+        $ma_hlv = $trainer['ma_hlv'] ?? 0;
 
-        // Tr\u1ea3 l\u1ecbch h\u1eb9n th\u1ef1c t\u1ebf tu\u1ea7n hi\u1ec7n t\u1ea1i
-        $monday = new DateTime();
-        $monday->modify('monday this week');
-        $sunday = clone $monday;
-        $sunday->modify('+6 days');
-
-        $stmt = $db->prepare("
-            SELECT
-                DATE(l.ngay_gio_tap)                    AS booking_date,
-                TIME_FORMAT(l.ngay_gio_tap, '%H:%i')    AS booking_time,
-                DAYOFWEEK(l.ngay_gio_tap)               AS mysql_dow,
-                l.loai_pt, l.trang_thai
-            FROM LICH_DAT_PT l
-            WHERE l.ma_hlv = ?
-              AND l.ngay_gio_tap BETWEEN ? AND ?
-              AND l.trang_thai != 'cancelled'
+        // Lấy danh sách đánh giá
+        $stmtR = $db->prepare("
+            SELECT d.*, u.ho_ten as ten_hoi_vien 
+            FROM DANH_GIA_HLV d 
+            JOIN HOI_VIEN hv ON d.ma_hoi_vien = hv.ma_hoi_vien 
+            JOIN NGUOI_DUNG u ON hv.ma_nguoi_dung = u.ma_nguoi_dung 
+            WHERE d.ma_hlv = ? AND d.trang_thai != 'rejected' 
+            ORDER BY d.created_at DESC
         ");
-        $stmt->execute([
-            $maHlv,
-            $monday->format('Y-m-d') . ' 00:00:00',
-            $sunday->format('Y-m-d') . ' 23:59:59'
-        ]);
-        $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmtR->execute([$ma_hlv]);
+        $reviews = $stmtR->fetchAll();
 
-        echo json_encode([
-            'bookings'   => $bookings,
-            'time_slots' => GYM_TIME_SLOTS,
-            'week_start' => $monday->format('Y-m-d'),
-        ]);
-        exit;
+        // Tính đánh giá trung bình
+        $stmtAvg = $db->prepare("SELECT AVG(so_sao) as avg_star, COUNT(*) as r_count FROM DANH_GIA_HLV WHERE ma_hlv = ? AND trang_thai = 'approved'");
+        $stmtAvg->execute([$ma_hlv]);
+        $avgData = $stmtAvg->fetch();
+        $avgRating = $avgData['avg_star'] ?? 5;
+        $reviewCount = $avgData['r_count'] ?? 0;
+
+        require __DIR__ . '/../views/trainer/ho-so.php';
+    }
+
+    /**
+     * Chức năng: Cập nhật thông tin cá nhân
+     */
+    public function updateProfile() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            require_once __DIR__ . '/../database/config.php';
+            $db = Database::getConnection();
+            $userId = $_SESSION['user_id'];
+
+            $ho_ten = $_POST['ho_ten'] ?? '';
+            $chuyen_mon = $_POST['chuyen_mon'] ?? '';
+            $kinh_nghiem = $_POST['nam_kinh_nghiem'] ?? 0;
+            $gioi_thieu = $_POST['gioi_thieu'] ?? '';
+
+            // Update NGUOI_DUNG
+            $stmtU = $db->prepare("UPDATE NGUOI_DUNG SET ho_ten = ? WHERE ma_nguoi_dung = ?");
+            $stmtU->execute([$ho_ten, $userId]);
+
+            // Update HUAN_LUYEN_VIEN
+            $sqlH = "UPDATE HUAN_LUYEN_VIEN SET chuyen_mon = ?, nam_kinh_nghiem = ?, gioi_thieu = ?";
+            $params = [$chuyen_mon, $kinh_nghiem, $gioi_thieu];
+
+            if (!empty($_FILES['anh_dai_dien']['name'])) {
+                $uploadDir = __DIR__ . '/../public/uploads/trainers/';
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+                $ext = pathinfo($_FILES['anh_dai_dien']['name'], PATHINFO_EXTENSION);
+                $filename = 'hlv_' . $userId . '_' . time() . '.' . $ext;
+                if (move_uploaded_file($_FILES['anh_dai_dien']['tmp_name'], $uploadDir . $filename)) {
+                    $sqlH .= ", anh_dai_dien = ?";
+                    $params[] = '/uploads/trainers/' . $filename;
+                }
+            }
+
+            $sqlH .= " WHERE ma_nguoi_dung = ?";
+            $params[] = $userId;
+
+            $stmtH = $db->prepare($sqlH);
+            $stmtH->execute($params);
+
+            setFlash('success', 'Cập nhật hồ sơ thành công!');
+            header('Location: ' . SITE_URL . '/trainer/profile');
+        }
+    }
+
+    /**
+     * Chức năng: Báo cáo đánh giá xấu
+     */
+    public function reportReview() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            require_once __DIR__ . '/../database/config.php';
+            $db = Database::getConnection();
+            $ma_dg = $_POST['ma_dg'] ?? 0;
+            
+            $db->prepare("UPDATE DANH_GIA_HLV SET trang_thai = 'reported' WHERE ma_dg = ?")->execute([$ma_dg]);
+            setFlash('success', 'Đã báo cáo bài đánh giá này cho Quản trị viên.');
+            header('Location: ' . SITE_URL . '/trainer/profile');
+        }
+    }
+
+    /**
+     * Chức năng: Lưu ghi chú về học viên
+     */
+    public function saveNote() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            require_once __DIR__ . '/../database/config.php';
+            $db = Database::getConnection();
+            $ma_hv = $_POST['ma_hoi_vien'] ?? 0;
+            $ghi_chu = $_POST['ghi_chu'] ?? '';
+            
+            // Có thể mở rộng bảng ghi chú, hiện tại giả định lưu vào một bảng riêng hoặc cột trong LICH_DAT_PT
+            // Demo: Cập nhật ghi chú vào lịch gần nhất của học viên này với HLV này
+            $stmt = $db->prepare("UPDATE LICH_DAT_PT SET ghi_chu = ? WHERE ma_hoi_vien = ? ORDER BY ngay_gio_tap DESC LIMIT 1");
+            $stmt->execute([$ghi_chu, $ma_hv]);
+            
+            setFlash('success', 'Đã lưu ghi chú về học viên.');
+            header('Location: ' . $_SERVER['HTTP_REFERER']);
+        }
     }
 }
-

@@ -3,15 +3,19 @@
  * View: Thời Khóa Biểu Tuần - Huấn Luyện Viên (tự động từ LICH_DAT_PT)
  * Route: /trainer/schedule
  */
-function trangThaiLabel(string $tt): array {
-    return match($tt) {
-        'pending'          => ['Chờ duyệt',    'chip-pending'],
-        'confirmed'        => ['Đã xác nhận',  'chip-confirmed'],
-        'cancel_requested' => ['Xin huỷ',      'chip-cancel'],
-        'cancel_rejected'  => ['Bị phạt',      'chip-rejected'],
-        'completed'        => ['Hoàn thành',   'chip-done'],
-        default            => [$tt,             'chip-pending'],
-    };
+if (!function_exists('trangThaiLabel')) {
+    function trangThaiLabel(string $tt): array {
+        return match($tt) {
+            'pending'          => ['Chờ duyệt',    'chip-pending'],
+            'confirmed'        => ['Đã xác nhận',  'chip-confirmed'],
+            'attended'         => ['Đã tập',       'chip-confirmed'],
+            'cancel_requested' => ['Xin huỷ',      'chip-cancel'],
+            'cancel_rejected'  => ['Bị phạt',      'chip-rejected'],
+            'completed'        => ['Hoàn thành',   'chip-done'],
+            'cancelled'        => ['Đã hủy',       'chip-cancel'],
+            default            => [$tt,             'chip-pending'],
+        };
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -77,9 +81,21 @@ function trangThaiLabel(string $tt): array {
         .chip-cancel    { background:#fee2e2; border-color:#ef4444; color:#7f1d1d; }
         .chip-rejected  { background:#fce7f3; border-color:#db2777; color:#831843; }
         .chip-done      { background:var(--bg-primary); border-color:var(--text-muted); color:var(--text-muted); }
-        .chip-time { font-weight:700; }
-        .chip-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px; }
-        .chip-label { font-size:.68rem; opacity:.85; }
+        .chip-time { 
+            font-size: 0.8rem;
+            font-weight: 800; 
+            background: rgba(255,255,255,0.4); 
+            display: inline-block; 
+            padding: 1px 6px; 
+            border-radius: 4px; 
+            margin-bottom: 4px;
+        }
+        .chip-name { font-weight: 700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px; }
+        .chip-label { font-size:.68rem; opacity:.85; font-weight: 600; }
+        
+        .tkb-table tr:hover td { background: rgba(var(--gold-rgb), 0.05); }
+        .th-time { position: sticky; left: 0; z-index: 10; }
+        .col-time { position: sticky; left: 0; z-index: 9; border-right: 2px solid var(--gold) !important; }
 
         /* Legend */
         .tkb-legend { display:flex; gap:1rem; flex-wrap:wrap; margin-top:1rem; font-size:.78rem; }
@@ -94,8 +110,14 @@ function trangThaiLabel(string $tt): array {
     </style>
 </head>
 <body>
-<?php require __DIR__ . '/layout/topbar.php'; ?>
-<div class="member-content">
+    <div class="admin-layout">
+        <?php require __DIR__ . '/layout/thanh-ben.php'; ?>
+
+        <main class="admin-content">
+            <header style="margin-bottom: 2rem;">
+                <h1 style="font-size: 2.5rem; font-weight: 900;">📅 Thời Khóa Biểu <span style="color: var(--primary);">Tuần</span></h1>
+                <p style="color: var(--text-muted);">Quản lý và theo dõi lịch dạy của bạn một cách trực quan.</p>
+            </header>
 
 <?php if (isset($_GET['msg'])): ?>
     <div class="alert alert-success"><?= htmlspecialchars($_GET['msg']) ?></div>
@@ -122,7 +144,7 @@ function trangThaiLabel(string $tt): array {
     foreach ($bookingByDate as $dayBk) {
         foreach ($dayBk as $b) {
             if ($b['trang_thai'] === 'pending')   $pendingCount++;
-            if ($b['trang_thai'] === 'confirmed') $confirmedCount++;
+            if ($b['trang_thai'] === 'confirmed' || $b['trang_thai'] === 'attended') $confirmedCount++;
         }
     }
     ?>
@@ -149,7 +171,7 @@ function trangThaiLabel(string $tt): array {
             </thead>
             <tbody>
                 <?php
-                // Định nghĩa khung giờ (có thêm "Ngoài giờ" cho lịch không khớp)
+                // Định nghĩa khung giờ
                 foreach ($timeSlots as $ts):
                     if (!empty($ts['is_break'])): ?>
                         <tr>
@@ -179,12 +201,27 @@ function trangThaiLabel(string $tt): array {
                                     <?php foreach ($cellBookings as $b):
                                         [$label, $cls] = trangThaiLabel($b['trang_thai']);
                                     ?>
-                                        <div class="booking-chip <?= $cls ?>">
+                                        <div class="booking-chip <?= $cls ?>" style="position: relative;">
+                                            <div class="chip-actions" style="position: absolute; top: 2px; right: 4px; display: flex; gap: 4px;">
+                                                <?php if ($b['kieu_lich'] === 'PT'): ?>
+                                                    <?php if ($b['trang_thai'] === 'pending'): ?>
+                                                        <a href="<?= SITE_URL ?>/trainer/schedule/resolve?id=<?= $b['ma_lich'] ?>&action=confirm" 
+                                                           title="Chấp nhận" style="color: #059669; text-decoration: none; font-size: 12px; font-weight: bold;">✓</a>
+                                                        <a href="<?= SITE_URL ?>/trainer/schedule/resolve?id=<?= $b['ma_lich'] ?>&action=cancel" 
+                                                           onclick="return confirm('Từ chối lịch hẹn này?')"
+                                                           title="Từ chối" style="color: #dc2626; text-decoration: none; font-size: 12px; font-weight: bold;">✕</a>
+                                                    <?php elseif ($b['trang_thai'] === 'confirmed'): ?>
+                                                        <a href="<?= SITE_URL ?>/trainer/schedule/resolve?id=<?= $b['ma_lich'] ?>&action=cancel" 
+                                                           onclick="return confirm('Bạn bận và muốn hủy lịch hẹn đã xác nhận này?')"
+                                                           title="Báo bận/Hủy" style="color: #6b7280; text-decoration: none; font-size: 12px; font-weight: bold;">✕</a>
+                                                    <?php endif; ?>
+                                                <?php endif; ?>
+                                            </div>
                                             <div class="chip-time"><?= htmlspecialchars($b['gio_hien']) ?></div>
                                             <div class="chip-name" title="<?= htmlspecialchars($b['ten_hoi_vien']) ?>">
-                                                <?= htmlspecialchars($b['ten_hoi_vien']) ?>
+                                                <?= ($b['kieu_lich'] === 'GROUP' ? '📚 ' : '👤 ') . htmlspecialchars($b['ten_hoi_vien']) ?>
                                             </div>
-                                            <div class="chip-label"><?= $label ?></div>
+                                            <div class="chip-label"><?= $b['kieu_lich'] === 'GROUP' ? 'Lớp nhóm' : $label ?></div>
                                             <?php if (!empty($b['ghi_chu'])): ?>
                                                 <div style="font-size:0.65rem; color:inherit; opacity:0.85; margin-top:2px; font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="<?= htmlspecialchars($b['ghi_chu']) ?>">
                                                     📝 <?= htmlspecialchars($b['ghi_chu']) ?>
@@ -210,7 +247,7 @@ function trangThaiLabel(string $tt): array {
                         $bt = strtotime('2000-01-01 ' . substr($b['ngay_gio_tap'], 11, 8));
                         $inSlot = false;
                         foreach ($timeSlots as $ts) {
-                            if ($bt >= strtotime('2000-01-01 '.$ts['bat_dau']) && $bt < strtotime('2000-01-01 '.$ts['ket_thuc'])) {
+                            if (!empty($ts['bat_dau']) && $bt >= strtotime('2000-01-01 '.$ts['bat_dau']) && $bt < strtotime('2000-01-01 '.$ts['ket_thuc'])) {
                                 $inSlot = true; break;
                             }
                         }
@@ -230,8 +267,8 @@ function trangThaiLabel(string $tt): array {
                                     ?>
                                         <div class="booking-chip <?= $cls ?>">
                                             <div class="chip-time"><?= htmlspecialchars($b['gio_hien']) ?></div>
-                                            <div class="chip-name"><?= htmlspecialchars($b['ten_hoi_vien']) ?></div>
-                                            <div class="chip-label"><?= $label ?></div>
+                                            <div class="chip-name"><?= ($b['kieu_lich'] === 'GROUP' ? '📚 ' : '👤 ') . htmlspecialchars($b['ten_hoi_vien']) ?></div>
+                                            <div class="chip-label"><?= $b['kieu_lich'] === 'GROUP' ? 'Lớp nhóm' : $label ?></div>
                                             <?php if (!empty($b['ghi_chu'])): ?>
                                                 <div style="font-size:0.65rem; color:inherit; opacity:0.85; margin-top:2px; font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="<?= htmlspecialchars($b['ghi_chu']) ?>">
                                                     📝 <?= htmlspecialchars($b['ghi_chu']) ?>
@@ -261,8 +298,8 @@ function trangThaiLabel(string $tt): array {
             💡 Lịch tự cập nhật theo hội viên đặt hẹn. Xem lịch hẹn chi tiết tại <a href="<?= SITE_URL ?>/trainer/dashboard" style="color:var(--gold);">Lịch Hẹn</a>
         </span>
     </div>
-</div>
-
-</div>
+</div> <!-- .glass-panel -->
+</main>
+</div> <!-- .admin-layout -->
 </body>
 </html>

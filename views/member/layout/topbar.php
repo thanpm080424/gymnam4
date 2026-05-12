@@ -37,6 +37,8 @@ function sdItem(string $href, string $icon, string $label, string $uri): string 
         <?= sdItem(SITE_URL.'/member/planner',          '🤖', 'Gym Planner AI', $uri) ?>
         <div class="sd-label">Tập luyện</div>
         <?= sdItem(SITE_URL.'/member/dashboard',         '🏠', 'Tổng quan', $uri) ?>
+        <?= sdItem(SITE_URL.'/member/classes',           '🧘', 'Lớp học Group X', $uri) ?>
+        <?= sdItem(SITE_URL.'/member/my-classes',        '📋', 'Lớp của tôi', $uri) ?>
         <?= sdItem(SITE_URL.'/member/booking',           '🗓️', 'Đặt lịch PT', $uri) ?>
         <?= sdItem(SITE_URL.'/member/journal',           '📓', 'Nhật ký', $uri) ?>
         <div class="sd-label">Dịch vụ</div>
@@ -93,6 +95,7 @@ function sdItem(string $href, string $icon, string $label, string $uri): string 
     </div>
     <div style="padding:4px 12px 2px; font-size:10px; font-weight:700; color:var(--text-muted); letter-spacing:0.5px; text-transform:uppercase; margin-top:6px;">Tập luyện</div>
     <a href="<?= SITE_URL ?>/member/dashboard"         style="display:flex;align-items:center;gap:10px;padding:10px 16px;font-size:13px;color:var(--text);">🏠 Tổng quan</a>
+    <a href="<?= SITE_URL ?>/member/classes"           style="display:flex;align-items:center;gap:10px;padding:10px 16px;font-size:13px;color:var(--text);">🧘 Lớp học Group X</a>
     <a href="<?= SITE_URL ?>/member/booking"            style="display:flex;align-items:center;gap:10px;padding:10px 16px;font-size:13px;color:var(--text);">🗓️ Đặt lịch PT</a>
     <a href="<?= SITE_URL ?>/member/journal"             style="display:flex;align-items:center;gap:10px;padding:10px 16px;font-size:13px;color:var(--text);">📓 Nhật ký</a>
     <a href="<?= SITE_URL ?>/member/planner"             style="display:flex;align-items:center;gap:10px;padding:10px 16px;font-size:13px;color:var(--text);">🤖 AI Planner</a>
@@ -160,10 +163,10 @@ function sdItem(string $href, string $icon, string $label, string $uri): string 
 <!-- Bottom Nav (mobile) -->
 <nav class="mg-bottom-nav">
     <?= mgTab(SITE_URL.'/member/dashboard', '🏠', 'Tổng quan',   $uri) ?>
-    <?= mgTab(SITE_URL.'/member/planner',   '🤖', 'AI Planner',  $uri, true) ?>
+    <?= mgTab(SITE_URL.'/member/classes',   '🧘', 'Group X',     $uri) ?>
     <?= mgTab(SITE_URL.'/member/booking',   '🗓️', 'Đặt lịch',    $uri) ?>
     <?= mgTab(SITE_URL.'/member/store',     '🛒', 'Cửa hàng',    $uri) ?>
-    <?= mgTab(SITE_URL.'/member/journal',   '📓', 'Nhật ký',     $uri) ?>
+    <?= mgTab(SITE_URL.'/member/planner',   '🤖', 'AI',          $uri, true) ?>
 </nav>
 
 <script>
@@ -202,10 +205,10 @@ requestAnimationFrame(() => {
 (function() {
     const TABS = [
         '<?= SITE_URL ?>/member/dashboard',
-        '<?= SITE_URL ?>/member/planner',
+        '<?= SITE_URL ?>/member/classes',
         '<?= SITE_URL ?>/member/booking',
         '<?= SITE_URL ?>/member/store',
-        '<?= SITE_URL ?>/member/journal',
+        '<?= SITE_URL ?>/member/planner',
     ];
 
     // Find current tab index

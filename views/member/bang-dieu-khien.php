@@ -46,6 +46,34 @@
             </div>
         </header>
 
+        <!-- UPCOMING CLASS NOTIFICATION -->
+        <?php if($nextClass): ?>
+        <div class="next-class-banner animate-up" style="margin-bottom: 30px;">
+            <div class="nc-content">
+                <div class="nc-label">⏰ LỚP HỌC SẮP DIỄN RA</div>
+                <h3 class="nc-name"><?= htmlspecialchars($nextClass['ten_lop']) ?></h3>
+                <div class="nc-meta">
+                    <span>📅 <?= date('d/m', strtotime($nextClass['ngay_hoc'])) ?></span>
+                    <span>🕒 <?= date('H:i', strtotime($nextClass['gio_bat_dau'])) ?></span>
+                    <span>👤 <?= htmlspecialchars($nextClass['ten_hlv']) ?></span>
+                </div>
+            </div>
+            <a href="<?= SITE_URL ?>/member/my-classes" class="nc-btn">Xem chi tiết</a>
+        </div>
+        <style>
+            .next-class-banner { background: linear-gradient(90deg, #84cc16 0%, #4d7c0f 100%); border-radius: 20px; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; color: #000; box-shadow: 0 10px 20px rgba(132, 204, 22, 0.2); }
+            .nc-label { font-size: 10px; font-weight: 800; opacity: 0.8; margin-bottom: 5px; }
+            .nc-name { font-size: 1.5rem; font-weight: 900; margin-bottom: 8px; }
+            .nc-meta { display: flex; gap: 15px; font-size: 0.9rem; font-weight: 700; opacity: 0.9; }
+            .nc-btn { background: #fff; color: #000; padding: 10px 20px; border-radius: 12px; font-weight: 800; text-decoration: none; font-size: 0.85rem; transition: 0.3s; }
+            .nc-btn:hover { transform: scale(1.05); box-shadow: 0 5px 15px rgba(255,255,255,0.3); }
+            @media (max-width: 600px) {
+                .next-class-banner { flex-direction: column; text-align: center; gap: 15px; padding: 20px; }
+                .nc-meta { justify-content: center; flex-wrap: wrap; }
+            }
+        </style>
+        <?php endif; ?>
+
         <style>
             .dash-welcome { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
             .welcome-text h1 { font-size: 32px; font-weight: 900; letter-spacing: -1.5px; margin-bottom: 4px; }

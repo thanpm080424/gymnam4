@@ -60,11 +60,20 @@ try {
         // ADMIN
         case '/admin/dashboard':   (new AdminController())->dashboard(); break;
         case '/admin/members':     (new AdminController())->members(); break;
+        case '/admin/leads':       (new AdminController())->leads(); break;
+        case '/api/admin/update-lead-status': (new AdminController())->updateLeadStatus(); break;
         case '/admin/packages':    (new AdminController())->packages(); break;
         case '/admin/packages/create': (new AdminController())->addPackage(); break;
         case '/admin/packages/update': (new AdminController())->updatePackage(); break;
         case '/admin/packages/delete': (new AdminController())->deletePackage(); break;
         case '/admin/history':     (new AdminController())->history(); break;
+        case '/admin/payroll':           (new AdminController())->payroll(); break;
+        case '/admin/payroll/calculate': (new AdminController())->calculatePayroll(); break;
+        case '/admin/payroll/pay':       (new AdminController())->paySalary(); break;
+        case '/admin/schedule':        (new AdminController())->schedule(); break;
+        case '/admin/schedule/create': (new AdminController())->createSchedule(); break;
+        case '/admin/schedule/delete': (new AdminController())->deleteSchedule(); break;
+        case '/admin/schedule/update': (new AdminController())->updateSchedule(); break;
         case '/admin/trainers':    (new AdminController())->trainers(); break;
         case '/admin/trainers/create': (new AdminController())->addTrainer(); break;
         case '/admin/trainers/update': (new AdminController())->updateTrainer(); break;
@@ -134,6 +143,10 @@ try {
         case '/member/locker':     (new MemberController())->locker(); break;
         case '/member/locker/request': (new MemberController())->lockerRequest(); break;
         case '/member/reviews':    (new MemberController())->reviews(); break;
+        case '/member/classes':    (new MemberController())->groupX(); break;
+        case '/member/my-classes': (new MemberController())->myClasses(); break;
+        case '/api/member/book-class': (new MemberController())->bookClass(); break;
+        case '/api/member/cancel-class': (new MemberController())->cancelClass(); break;
         case '/member/reviews/submit': (new MemberController())->submitReview(); break;
         case '/member/reviews/delete': (new MemberController())->deleteReview(); break;
         case '/member/change-password': (new MemberController())->changePassword(); break;
@@ -164,9 +177,15 @@ try {
         case '/trainer/schedule':        (new TrainerController())->schedule(); break;
         case '/trainer/schedule/update': (new TrainerController())->scheduleUpdate(); break;
         case '/trainer/schedule/delete': (new TrainerController())->scheduleDeleteSlot(); break;
+        case '/trainer/schedule/resolve': (new TrainerController())->scheduleResolve(); break;
         case '/trainer/schedule/api':    TrainerController::getScheduleApi(); break;
+        case '/trainer/my-payroll':      (new TrainerController())->myPayroll(); break;
         case '/api/qr-token':
             require __DIR__ . '/api/qr-token.php'; break;
+
+        case '/api/dang-ky-tap-thu':
+            (new LandingController())->dangKyTapThu();
+            break;
 
         case '/api/chat':
             (new AiController())->chat();

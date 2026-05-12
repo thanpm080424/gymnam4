@@ -116,3 +116,27 @@ if (!defined('LOG_DIR')) {
         mkdir(LOG_DIR, 0755, true);
     }
 }
+
+// ============================================================================
+// GYM TIME SLOTS (Khung giờ hoạt động)
+// ============================================================================
+if (!defined('GYM_TIME_SLOTS')) {
+    define('GYM_TIME_SLOTS', [
+        ['bat_dau' => '06:00:00', 'ket_thuc' => '07:00:00', 'is_break' => false],
+        ['bat_dau' => '07:00:00', 'ket_thuc' => '08:00:00', 'is_break' => false],
+        ['bat_dau' => '08:00:00', 'ket_thuc' => '09:00:00', 'is_break' => false],
+        ['bat_dau' => '09:00:00', 'ket_thuc' => '10:00:00', 'is_break' => false],
+        ['bat_dau' => '10:00:00', 'ket_thuc' => '11:00:00', 'is_break' => false],
+        ['bat_dau' => '11:00:00', 'ket_thuc' => '12:00:00', 'is_break' => false],
+        ['bat_dau' => '12:00:00', 'ket_thuc' => '13:00:00', 'is_break' => true],
+        ['bat_dau' => '13:00:00', 'ket_thuc' => '14:00:00', 'is_break' => false],
+        ['bat_dau' => '14:00:00', 'ket_thuc' => '15:00:00', 'is_break' => false],
+        ['bat_dau' => '15:00:00', 'ket_thuc' => '16:00:00', 'is_break' => false],
+        ['bat_dau' => '16:00:00', 'ket_thuc' => '17:00:00', 'is_break' => false],
+        ['bat_dau' => '17:00:00', 'ket_thuc' => '18:00:00', 'is_break' => false],
+        ['bat_dau' => '18:00:00', 'ket_thuc' => '19:00:00', 'is_break' => false],
+        ['bat_dau' => '19:00:00', 'ket_thuc' => '20:00:00', 'is_break' => false],
+        ['bat_dau' => '20:00:00', 'ket_thuc' => '21:00:00', 'is_break' => false],
+    ]);
+}
+

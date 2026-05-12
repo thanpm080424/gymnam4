@@ -616,3 +616,68 @@ a:hover { color: var(--gold-dark); }
 
 /* Bootstrap dark override — not needed anymore, but keep for compatibility */
 .bg-light, .bg-white { background: var(--bg-primary) !important; }
+
+/* ============================================
+   SALES CRM STYLES
+   ============================================ */
+.sales-crm {
+  margin: 40px auto;
+  padding: 20px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  color: var(--text-primary);
+}
+.sales-crm h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 16px;
+}
+.sales-crm .crm-columns {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+.sales-crm .crm-column {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+.sales-crm .crm-column h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  text-align: center;
+}
+.sales-crm .crm-items {
+  min-height: 100px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sales-crm .crm-item {
+  padding: 10px;
+  background: var(--gold-bg);
+  border: 1px solid var(--gold-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-weight: 500;
+  cursor: grab;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.sales-crm .crm-item:hover {
+  transform: scale(1.02);
+  box-shadow: var(--shadow-md);
+}
+.sales-crm .crm-item:active {
+  cursor: grabbing;
+}

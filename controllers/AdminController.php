@@ -103,12 +103,29 @@ class AdminController {
         }
 
         // ============================================
-        // 4. HOAT DONG PHONG TAP (CHECK-INS)
+        // 4. DOANH THU THEO NGUỒN (PIE/DOUGHNUT)
         // ============================================
-        // Check-ins today
-        $checkInsToday = $db->query("SELECT COUNT(*) FROM LICH_SU_RA_VAO WHERE DATE(thoi_gian_vao) = CURDATE()")->fetchColumn();
-        
-        // Peak hours in the filtered range
+        $membershipRev = $db->query("SELECT SUM(so_tien) FROM THANH_TOAN WHERE trang_thai='success' AND $dateCondition")->fetchColumn() ?: 0;
+        $productRev = $db->query("
+            SELECT SUM(s.gia_tien) 
+            FROM DON_HANG_SP d JOIN SAN_PHAM s ON d.ma_sp=s.ma_sp 
+            WHERE d.trang_thai='completed' AND " . str_replace('created_at', 'ngay_mua', $dateCondition)
+        )->fetchColumn() ?: 0;
+
+        // ============================================
+        // 5. CHI PHÍ LƯƠNG (PAYROLL EXPENSES)
+        // ============================================
+        $payrollExpense = $db->prepare("SELECT SUM(tong_luong) FROM BANG_LUONG WHERE thang_nam = ?");
+        $payrollExpense->execute([date('m/Y')]);
+        $totalPayroll = $payrollExpense->fetchColumn() ?: 0;
+
+        // ============================================
+        // 6. TĂNG TRƯỞNG (MONTH OVER MONTH)
+        // ============================================
+        $lastMonthRev = $db->query("SELECT SUM(so_tien) FROM THANH_TOAN WHERE trang_thai='success' AND MONTH(created_at) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(created_at) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))")->fetchColumn() ?: 0;
+        $revGrowth = ($lastMonthRev > 0) ? round((($membershipRev - $lastMonthRev) / $lastMonthRev) * 100, 1) : 100;
+
+        // Peak hours
         $sqlPeak = "
             SELECT HOUR(thoi_gian_vao) as h, COUNT(*) as c 
             FROM LICH_SU_RA_VAO 
@@ -117,7 +134,7 @@ class AdminController {
             ORDER BY c DESC LIMIT 1
         ";
         $peakHourRow = $db->query($sqlPeak)->fetch();
-        $peakHour = $peakHourRow ? $peakHourRow['h'] . ":00 - " . ($peakHourRow['h'] + 1) . ":00" : "Chua co data";
+        $peakHour = $peakHourRow ? $peakHourRow['h'] . ":00 - " . ($peakHourRow['h'] + 1) . ":00" : "N/A";
 
         require __DIR__ . '/../views/admin/bang-dieu-khien.php';
     }
@@ -1421,15 +1438,17 @@ class AdminController {
 
             $db->beginTransaction();
 
-            // Lấy thông tin gói tập để tính ngày hết hạn
+            // Lấy thông tin gói tập để tính ngày hết hạn và số buổi PT
             $info = $db->selectOne("
-                SELECT dk.ma_hoi_vien, gt.thoi_han_thang
+                SELECT dk.ma_hoi_vien, gt.thoi_han_thang, gt.so_buoi_pt
                 FROM DANG_KY_GOI dk
+                JOIN GOI_TAP g ON dk.ma_goi = g.ma_goi
                 JOIN GOI_TAP gt ON dk.ma_goi = gt.ma_goi
                 WHERE dk.ma_dang_ky = ?
             ", [$maDangKy]);
 
             $thoiHanThang = (int)($info['thoi_han_thang'] ?? 1);
+            $soBuoiPT = (int)($info['so_buoi_pt'] ?? 0);
             $maHoiVien = $info['ma_hoi_vien'];
             
             $ngayKichHoat = date('Y-m-d');
@@ -1443,8 +1462,9 @@ class AdminController {
             $db->execute("UPDATE DANG_KY_GOI SET trang_thai='active', ngay_kich_hoat=?, ngay_ket_thuc=? WHERE ma_dang_ky=?", 
                 [$ngayKichHoat, $ngayKetThuc, $maDangKy]);
 
-            $db->execute("UPDATE HOI_VIEN SET ngay_het_han_goi = ? WHERE ma_hoi_vien = ?", 
-                [$ngayKetThuc, $maHoiVien]);
+            // Cập nhật ngày hết hạn và CỘNG DỒN số buổi PT
+            $db->execute("UPDATE HOI_VIEN SET ngay_het_han_goi = ?, so_buoi_pt_con_lai = so_buoi_pt_con_lai + ? WHERE ma_hoi_vien = ?", 
+                [$ngayKetThuc, $soBuoiPT, $maHoiVien]);
 
             $db->commit();
             
@@ -1523,7 +1543,7 @@ class AdminController {
                 WHERE hv.ngay_het_han_goi >= CURDATE()
                 GROUP BY hv.ma_hoi_vien, nd.ho_ten, nd.ten_dang_nhap, nd.email
                 HAVING DATEDIFF(CURDATE(), DATE(last_checkin)) = 15
-                   OR (last_checkin IS NULL AND DATEDIFF(CURDATE(), DATE(hv.created_at)) = 15)
+                   OR (last_checkin IS NULL AND DATEDIFF(CURDATE(), DATE(nd.created_at)) = 15)
             ");
             $stmtAbsent->execute();
             $absentMembers = $stmtAbsent->fetchAll();
@@ -1574,6 +1594,35 @@ class AdminController {
             }
         } catch (Exception $e) {
             error_log('Expiration reminder query error: ' . $e->getMessage());
+        }
+
+        // --- 3. NHẮC NHỞ HẾT HẠN TỦ ĐỒ (còn đúng 3 ngày) ---
+        try {
+            $stmtLocker = $db->prepare("
+                SELECT yc.ma_yc, nd.ho_ten, nd.ten_dang_nhap, nd.email, td.so_tu, yc.ngay_ket_thuc
+                FROM YEU_CAU_THUE_TU yc
+                JOIN HOI_VIEN hv ON yc.ma_hoi_vien = hv.ma_hoi_vien
+                JOIN NGUOI_DUNG nd ON hv.ma_nguoi_dung = nd.ma_nguoi_dung
+                JOIN TU_DO td ON yc.ma_tu = td.ma_tu
+                WHERE yc.trang_thai = 'approved' AND DATEDIFF(yc.ngay_ket_thuc, CURDATE()) = 3
+            ");
+            $stmtLocker->execute();
+            $expiringLockers = $stmtLocker->fetchAll();
+
+            foreach ($expiringLockers as $l) {
+                $toEmail = !empty($l['email']) ? $l['email'] : $l['ten_dang_nhap'];
+                $toName  = !empty($l['ho_ten']) ? $l['ho_ten'] : $l['ten_dang_nhap'];
+                if (!filter_var($toEmail, FILTER_VALIDATE_EMAIL)) continue;
+                try {
+                    $emailService->sendLockerExpirationReminder($toEmail, $toName, $l['so_tu'], 3);
+                    $sent++;
+                } catch (Exception $e) {
+                    $errors++;
+                    error_log('Locker expiration email failed for ' . $toEmail . ': ' . $e->getMessage());
+                }
+            }
+        } catch (Exception $e) {
+            error_log('Locker expiration reminder query error: ' . $e->getMessage());
         }
 
         setFlash('success', "✅ Đã gửi $sent email nhắc nhở! (Lỗi: $errors)");
@@ -1632,6 +1681,182 @@ class AdminController {
         }
     }
 
+    // Hiển thị giao diện Kanban CRM
+    public function leads() {
+        require_once __DIR__ . '/../database/config.php';
+        $db = Database::getConnection();
+        
+        // Lấy toàn bộ danh sách khách hàng đăng ký tập thử
+        $stmt = $db->query("SELECT * FROM DANG_KY_TAP_THU ORDER BY ngay_dang_ky DESC");
+        $leads = $stmt ? $stmt->fetchAll() : [];
+        
+        // Phân loại data vào 5 cột
+        $board = [
+            'chua_goi' => [],
+            'da_goi' => [],
+            'dang_cho' => [],
+            'da_chot' => [],
+            'that_bai' => []
+        ];
+        
+        foreach ($leads as $lead) {
+            $board[$lead['trang_thai']][] = $lead;
+        }
+        
+        require __DIR__ . '/../views/admin/quan-ly-khach-tiem-nang.php';
+    }
+
+    // API Cập nhật trạng thái bằng AJAX khi kéo thả
+    public function updateLeadStatus() {
+        header('Content-Type: application/json');
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $id = $_POST['id'] ?? '';
+            $status = $_POST['status'] ?? '';
+            
+            if ($id && $status) {
+                try {
+                    $db = Database::getConnection();
+                    $stmt = $db->prepare("UPDATE DANG_KY_TAP_THU SET trang_thai = ? WHERE id = ?");
+                    $stmt->execute([$status, $id]);
+                    echo json_encode(['success' => true]);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'message' => 'Lỗi CSDL.']);
+                }
+            }
+        }
+    }
+    // Hiển thị trang xếp lịch Group X
+    public function schedule() {
+        require_once __DIR__ . '/../database/config.php';
+        $db = Database::getConnection();
+        
+        $classes = $db->query("SELECT * FROM LOP_HOC_NHOM")->fetchAll();
+        $trainers = $db->query("
+            SELECT h.ma_hlv, u.ho_ten, u.ten_dang_nhap 
+            FROM HUAN_LUYEN_VIEN h 
+            JOIN NGUOI_DUNG u ON h.ma_nguoi_dung = u.ma_nguoi_dung
+        ")->fetchAll();
+        
+        $schedules = $db->query("
+            SELECT lh.*, l.ten_lop, l.loai_lop, COALESCE(u.ho_ten, u.ten_dang_nhap) as ten_hlv
+            FROM LICH_HOC_NHOM lh
+            JOIN LOP_HOC_NHOM l ON lh.ma_lop = l.ma_lop
+            JOIN HUAN_LUYEN_VIEN h ON lh.ma_hlv = h.ma_hlv
+            JOIN NGUOI_DUNG u ON h.ma_nguoi_dung = u.ma_nguoi_dung
+            ORDER BY lh.ngay_hoc ASC, lh.gio_bat_dau ASC
+        ")->fetchAll();
+        
+        require __DIR__ . '/../views/admin/quan-ly-lich-hoc.php';
+    }
+
+    public function createSchedule() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            require_once __DIR__ . '/../database/config.php';
+            $db = Database::getConnection();
+            $maHlv = $_POST['ma_hlv'];
+            $ngay = $_POST['ngay_hoc'];
+            $batDau = $_POST['gio_bat_dau'];
+            $ngayGioPT = $ngay . ' ' . $batDau;
+
+            // --- KIỂM TRA TRÙNG LỊCH HLV ---
+            
+            // 1. Kiểm tra trong LICH_HOC_NHOM (Trùng với lớp nhóm khác)
+            $stmtConflictGroup = $db->prepare("
+                SELECT COUNT(*) FROM LICH_HOC_NHOM 
+                WHERE ma_hlv = ? AND ngay_hoc = ? AND gio_bat_dau = ?
+            ");
+            $stmtConflictGroup->execute([$maHlv, $ngay, $batDau]);
+            if ($stmtConflictGroup->fetchColumn() > 0) {
+                header('Location: ' . SITE_URL . '/admin/schedule?error=' . urlencode("HLV đã có lịch dạy lớp nhóm khác vào khung giờ này!"));
+                exit;
+            }
+
+            // 2. Kiểm tra trong LICH_DAT_PT (Trùng với khách PT)
+            $stmtConflictPT = $db->prepare("
+                SELECT COUNT(*) FROM LICH_DAT_PT 
+                WHERE ma_hlv = ? AND ngay_gio_tap = ? AND trang_thai != 'cancelled'
+            ");
+            $stmtConflictPT->execute([$maHlv, $ngayGioPT]);
+            if ($stmtConflictPT->fetchColumn() > 0) {
+                header('Location: ' . SITE_URL . '/admin/schedule?error=' . urlencode("HLV bận dạy PT cho hội viên vào khung giờ này!"));
+                exit;
+            }
+            // --- KẾT THÚC KIỂM TRA ---
+
+            $stmt = $db->prepare("INSERT INTO LICH_HOC_NHOM (ma_lop, ma_hlv, ngay_hoc, gio_bat_dau, gio_ket_thuc, so_luong_toi_da) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$_POST['ma_lop'], $maHlv, $ngay, $batDau, $_POST['gio_ket_thuc'], $_POST['so_luong']]);
+            header('Location: ' . SITE_URL . '/admin/schedule?success=1');
+            exit;
+        }
+    }
+
+    public function payroll() {
+        require_once __DIR__ . '/../database/config.php';
+        $db = Database::getConnection();
+        $month = $_GET['month'] ?? date('m/Y'); 
+        
+        // Sửa lỗi: Sử dụng prepare thay vì query trực tiếp để tránh lỗi injection và sai cú pháp PDO
+        $stmt = $db->prepare("
+            SELECT b.*, COALESCE(u.ho_ten, u.ten_dang_nhap) as ho_ten, u.ten_dang_nhap 
+            FROM BANG_LUONG b 
+            JOIN HUAN_LUYEN_VIEN h ON b.ma_hlv = h.ma_hlv 
+            JOIN NGUOI_DUNG u ON h.ma_nguoi_dung = u.ma_nguoi_dung
+            WHERE b.thang_nam = ?
+        ");
+        $stmt->execute([$month]);
+        $payrolls = $stmt->fetchAll();
+        
+        require __DIR__ . '/../views/admin/quan-ly-luong.php';
+    }
+
+    public function calculatePayroll() {
+        require_once __DIR__ . '/../database/config.php';
+        $db = Database::getConnection();
+        $month = date('m/Y');
+        $dbMonth = date('Y-m'); 
+
+        try {
+            $db->prepare("DELETE FROM BANG_LUONG WHERE thang_nam = ? AND trang_thai = 'chua_thanh_toan'")->execute([$month]);
+            $trainers = $db->query("SELECT * FROM HUAN_LUYEN_VIEN")->fetchAll();
+            
+            foreach ($trainers as $t) {
+                // Đếm số buổi Lớp nhóm
+                $stmtCountGroup = $db->prepare("SELECT COUNT(*) as tong_buoi FROM LICH_HOC_NHOM WHERE ma_hlv = ? AND DATE_FORMAT(ngay_hoc, '%Y-%m') = ?");
+                $stmtCountGroup->execute([$t['ma_hlv'], $dbMonth]);
+                $so_buoi_nhom = $stmtCountGroup->fetch()['tong_buoi'] ?? 0;
+                
+                // Đếm số buổi PT (Chỉ tính các buổi đã xác nhận, hoàn thành hoặc đã tập)
+                $stmtCountPT = $db->prepare("
+                    SELECT COUNT(*) as tong_buoi 
+                    FROM LICH_DAT_PT 
+                    WHERE ma_hlv = ? 
+                      AND DATE_FORMAT(ngay_gio_tap, '%Y-%m') = ?
+                      AND trang_thai IN ('confirmed', 'completed', 'attended', 'cancel_rejected')
+                ");
+                $stmtCountPT->execute([$t['ma_hlv'], $dbMonth]);
+                $so_buoi_pt = $stmtCountPT->fetch()['tong_buoi'] ?? 0;
+
+                $so_buoi = $so_buoi_nhom + $so_buoi_pt;
+                
+                $thuong = $so_buoi * ($t['gia_buoi_day'] ?? 150000);
+                $tong = ($t['luong_cung'] ?? 5000000) + $thuong;
+                
+                $db->prepare("INSERT INTO BANG_LUONG (ma_hlv, thang_nam, luong_cung, so_buoi_day, thuong_hoa_hong, tong_luong) VALUES (?, ?, ?, ?, ?, ?)")
+                   ->execute([$t['ma_hlv'], $month, $t['luong_cung'], $so_buoi, $thuong, $tong]);
+            }
+            header('Location: ' . SITE_URL . '/admin/payroll?success=1');
+            exit;
+        } catch (Exception $e) { die("Lỗi: " . $e->getMessage()); }
+    }
+
+    public function paySalary() {
+        $db = Database::getConnection();
+        if (isset($_GET['id'])) {
+            $db->prepare("UPDATE BANG_LUONG SET trang_thai = 'da_thanh_toan' WHERE ma_luong = ?")->execute([$_GET['id']]);
+            header('Location: ' . SITE_URL . '/admin/payroll?paid=1');
+            exit;
+        }
+    }
 }
 
 // ============================================================
@@ -1694,9 +1919,7 @@ function _adminSendPaymentEmail(
 </div>
 </body></html>";
 
-    // Gửi qua PHPMailer nếu có, fallback php mail()
-    $headers  = "From: Monkey Gym <" . (defined('MAIL_FROM') ? MAIL_FROM : 'noreply@monkeygym.local') . ">\r\n";
-    $headers .= "MIME-Version: 1.0\r\n";
-    $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
-    @mail($toEmail, $subject, $body, $headers);
+    require_once __DIR__ . '/../includes/EmailService.php';
+    $emailService = new EmailService();
+    $emailService->send($toEmail, $subject, $body);
 }

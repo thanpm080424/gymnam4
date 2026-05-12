@@ -210,6 +210,15 @@ class EmailService {
     }
     
     /**
+     * Send locker expiration reminder email
+     */
+    public function sendLockerExpirationReminder($email, $memberName, $soTu, $daysLeft) {
+        $subject = "⏰ Tủ đồ số $soTu của bạn sẽ hết hạn sau $daysLeft ngày!";
+        $content = $this->getLockerExpirationTemplate($memberName, $soTu, $daysLeft);
+        return $this->send($email, $subject, $content);
+    }
+    
+    /**
      * Welcome email template
      */
     private function getWelcomeTemplate($name, $username) {
@@ -443,6 +452,40 @@ class EmailService {
                 </div>
                 <p style='font-size: 12px; color: #aaa; text-align: center; border-top: 1px solid #eee; padding-top: 15px;'>
                     © " . date('Y') . " Monkey Gym. All rights reserved.
+                </p>
+            </div>
+        </body>
+        </html>
+        ";
+    }
+
+    /**
+     * Locker expiration reminder template
+     */
+    private function getLockerExpirationTemplate($memberName, $soTu, $daysLeft) {
+        $color = $daysLeft <= 1 ? '#F44336' : '#FF9800';
+        return "
+        <html>
+        <head>
+            <meta charset='UTF-8'>
+        </head>
+        <body style='font-family: Arial, sans-serif; background-color: #f5f5f5;'>
+            <div style='max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>
+                <div style='background-color: $color; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;'>
+                    <h2 style='color: white; margin: 0;'>Thông Báo Hết Hạn Tủ Đồ ⏰</h2>
+                </div>
+                <div style='padding: 20px;'>
+                    <p style='font-size: 16px; color: #333;'>Xin chào <strong>$memberName</strong>,</p>
+                    <p style='font-size: 16px; color: #555; line-height: 1.6;'>
+                        Monkey Gym xin thông báo: Thời gian thuê tủ đồ số <strong>$soTu</strong> của bạn chỉ còn <strong>$daysLeft ngày</strong> nữa là sẽ hết hạn.
+                    </p>
+                    <div style='background-color: #FFF3E0; border-left: 4px solid $color; padding: 15px; margin: 20px 0;'>
+                        <p style='margin: 0; color: #E65100; font-weight: bold;'>Lưu ý quan trọng!</p>
+                        <p style='margin: 5px 0 0 0; color: #E65100; font-size: 14px;'>Vui lòng đến quầy lễ tân để gia hạn nếu bạn muốn tiếp tục sử dụng, hoặc dọn dẹp đồ đạc và trả lại chìa khóa trước ngày hết hạn để tránh phí phạt.</p>
+                    </div>
+                </div>
+                <p style='font-size: 12px; color: #aaa; text-align: center; border-top: 1px solid #eee; padding-top: 15px;'>
+                    © " . date('Y') . " Monkey Gym. Trân trọng cảm ơn bạn đã đồng hành cùng chúng tôi.
                 </p>
             </div>
         </body>

@@ -8,8 +8,9 @@
     <link rel="stylesheet" href="<?= ASSET_URL ?>/css/styles.css">
 </head>
 <body>
-<?php require __DIR__ . '/layout/topbar.php'; ?>
-<div class="member-content">
+<div class="admin-layout">
+    <?php require __DIR__ . '/layout/thanh-ben.php'; ?>
+    <main class="admin-content">
 
 
     <?php
@@ -102,7 +103,8 @@
         <?php endforeach; ?>
     </div>
     <?php endif; ?>
-</div>
-</div>
+
+    </main>
+</div><!-- .admin-layout -->
 </body>
 </html>

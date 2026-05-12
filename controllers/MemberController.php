@@ -66,6 +66,25 @@ class MemberController {
         // 3. Lấy thông báo hệ thống
         $announcements = $db->query("SELECT * FROM THONG_BAO_HE_THONG WHERE trang_thai = 'active' ORDER BY created_at DESC")->fetchAll();
 
+        // 4. Lấy lớp học Group X sắp diễn ra nhất của hội viên này
+        $nextClass = null;
+        if ($memberId) {
+            $stmtNext = $db->prepare("
+                SELECT lh.*, l.ten_lop, l.hinh_anh, COALESCE(u.ho_ten, u.ten_dang_nhap) as ten_hlv
+                FROM DAT_CHO_LOP_HOC dc
+                JOIN LICH_HOC_NHOM lh ON dc.ma_lich = lh.ma_lich
+                JOIN LOP_HOC_NHOM l ON lh.ma_lop = l.ma_lop
+                JOIN HUAN_LUYEN_VIEN h ON lh.ma_hlv = h.ma_hlv
+                JOIN NGUOI_DUNG u ON h.ma_nguoi_dung = u.ma_nguoi_dung
+                WHERE dc.ma_hoi_vien = ? AND dc.trang_thai = 'thanh_cong' 
+                  AND (lh.ngay_hoc > CURDATE() OR (lh.ngay_hoc = CURDATE() AND lh.gio_bat_dau > CURTIME()))
+                ORDER BY lh.ngay_hoc ASC, lh.gio_bat_dau ASC
+                LIMIT 1
+            ");
+            $stmtNext->execute([$memberId]);
+            $nextClass = $stmtNext->fetch();
+        }
+
         require __DIR__ . '/../views/member/bang-dieu-khien.php';
     }
 
@@ -421,6 +440,42 @@ class MemberController {
             $ngayTap = $_POST['ngay_tap'] ?? date('Y-m-d');
             $gioTap = $_POST['gio_tap'] ?? '00:00:00';
             $ngayGio = date('Y-m-d H:i:s', strtotime("$ngayTap $gioTap"));
+
+            // Chặn đặt lịch trong quá khứ
+            if (strtotime($ngayGio) < (time() - 300)) { // Cho phép sai số 5 phút
+                setFlash('danger', 'Khung giờ này đã HẾT HẠN! Vui lòng chọn thời gian khác.');
+                header("Location: " . SITE_URL . "/member/booking");
+                exit;
+            }
+
+            // --- KIỂM TRA TRÙNG LỊCH HLV ---
+            $checkDate = $ngay;
+            $checkTime = $khungGio . ':00';
+
+            // 1. Kiểm tra trong LICH_DAT_PT (Trùng với khách PT khác)
+            $stmtConflictPT = $db->prepare("
+                SELECT COUNT(*) FROM LICH_DAT_PT 
+                WHERE ma_hlv = ? AND ngay_gio_tap = ? AND trang_thai != 'cancelled'
+            ");
+            $stmtConflictPT->execute([$hlvId, $ngayGio]);
+            if ($stmtConflictPT->fetchColumn() > 0) {
+                setFlash('danger', 'HLV đã có lịch dạy PT khác vào khung giờ này. Vui lòng chọn giờ khác.');
+                header("Location: " . SITE_URL . "/member/booking");
+                exit;
+            }
+
+            // 2. Kiểm tra trong LICH_HOC_NHOM (Trùng với lớp Group X)
+            $stmtConflictGroup = $db->prepare("
+                SELECT COUNT(*) FROM LICH_HOC_NHOM 
+                WHERE ma_hlv = ? AND ngay_hoc = ? AND gio_bat_dau = ?
+            ");
+            $stmtConflictGroup->execute([$hlvId, $checkDate, $checkTime]);
+            if ($stmtConflictGroup->fetchColumn() > 0) {
+                setFlash('danger', 'HLV bận dạy lớp nhóm (Group X) vào khung giờ này. Vui lòng chọn giờ khác.');
+                header("Location: " . SITE_URL . "/member/booking");
+                exit;
+            }
+            // --- KẾT THÚC KIỂM TRA ---
 
             // Check trùng lịch của chính hội viên (chặn khoảng thời gian 60 phút)
             $stmtOverlap = $db->prepare("SELECT COUNT(*) FROM LICH_DAT_PT WHERE ma_hoi_vien = ? AND ABS(TIMESTAMPDIFF(MINUTE, ngay_gio_tap, ?)) < 60 AND trang_thai != 'cancelled'");
@@ -1169,6 +1224,169 @@ class MemberController {
             if ($db->inTransaction()) $db->rollBack();
             setFlash('danger', 'Lỗi: ' . $e->getMessage());
             redirect('/member/cart');
+        }
+    }
+    // Hiển thị danh sách Lớp học Group X (Member View)
+    public function groupX() {
+        require_once __DIR__ . '/../database/config.php';
+        $db = Database::getConnection();
+        
+        $userId = $_SESSION['user_id'];
+        
+        $stmtM = $db->prepare("SELECT ma_hoi_vien FROM HOI_VIEN WHERE ma_nguoi_dung = ?");
+        $stmtM->execute([$userId]);
+        $memberId = $stmtM->fetchColumn();
+
+        // Lấy danh sách lịch học từ hôm nay trở đi, kèm theo số lượng đã đặt
+        $query = "
+            SELECT lh.*, l.ten_lop, l.mo_ta, l.hinh_anh, l.loai_lop, COALESCE(u.ho_ten, u.ten_dang_nhap) as ten_hlv,
+                   (SELECT COUNT(*) FROM DAT_CHO_LOP_HOC WHERE ma_lich = lh.ma_lich) as so_nguoi_da_dat,
+                   (SELECT COUNT(*) FROM DAT_CHO_LOP_HOC WHERE ma_lich = lh.ma_lich AND ma_hoi_vien = ?) as toi_da_dat
+            FROM LICH_HOC_NHOM lh
+            JOIN LOP_HOC_NHOM l ON lh.ma_lop = l.ma_lop
+            JOIN HUAN_LUYEN_VIEN h ON lh.ma_hlv = h.ma_hlv
+            JOIN NGUOI_DUNG u ON h.ma_nguoi_dung = u.ma_nguoi_dung
+            WHERE lh.ngay_hoc >= CURDATE()
+            ORDER BY lh.ngay_hoc ASC, lh.gio_bat_dau ASC
+        ";
+        
+        $stmt = $db->prepare($query);
+        $stmt->execute([$memberId]);
+        $schedules = $stmt->fetchAll();
+        
+        require __DIR__ . '/../views/member/lop-hoc.php';
+    }
+
+    // API Xử lý Đặt chỗ (AJAX)
+    public function bookClass() {
+        header('Content-Type: application/json');
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            require_once __DIR__ . '/../database/config.php';
+            $db = Database::getConnection();
+            $userId = $_SESSION['user_id'];
+            
+            $stmtM = $db->prepare("SELECT ma_hoi_vien FROM HOI_VIEN WHERE ma_nguoi_dung = ?");
+            $stmtM->execute([$userId]);
+            $memberId = $stmtM->fetchColumn();
+            
+            $ma_lich = $_POST['ma_lich'] ?? '';
+
+            if ($ma_lich && $memberId) {
+                try {
+                    // 1. Kiểm tra xem lớp đã đầy chưa
+                    $stmt = $db->prepare("SELECT so_luong_toi_da, (SELECT COUNT(*) FROM DAT_CHO_LOP_HOC WHERE ma_lich = ?) as dang_co FROM LICH_HOC_NHOM WHERE ma_lich = ?");
+                    $stmt->execute([$ma_lich, $ma_lich]);
+                    $classInfo = $stmt->fetch();
+
+                    if ($classInfo['dang_co'] >= $classInfo['so_luong_toi_da']) {
+                        echo json_encode(['success' => false, 'message' => 'Rất tiếc, lớp học đã kín chỗ!']);
+                        return;
+                    }
+
+                    // 2. Tiến hành đặt chỗ
+                    $stmt = $db->prepare("INSERT INTO DAT_CHO_LOP_HOC (ma_lich, ma_hoi_vien) VALUES (?, ?)");
+                    $stmt->execute([$ma_lich, $memberId]);
+                    
+                    echo json_encode(['success' => true, 'message' => 'Đặt chỗ thành công! Hẹn gặp bạn tại phòng tập.']);
+                } catch (PDOException $e) {
+                    if ($e->getCode() == 23000) {
+                        echo json_encode(['success' => false, 'message' => 'Bạn đã đặt chỗ cho lớp học này rồi.']);
+                    } else {
+                        echo json_encode(['success' => false, 'message' => 'Lỗi hệ thống: ' . $e->getMessage()]);
+                    }
+                }
+            }
+        }
+    }
+    // Trang Lịch sử lớp học của tôi
+    public function myClasses() {
+        require_once __DIR__ . '/../database/config.php';
+        $db = Database::getConnection();
+        $userId = $_SESSION['user_id'];
+
+        $stmtM = $db->prepare("SELECT ma_hoi_vien FROM HOI_VIEN WHERE ma_nguoi_dung = ?");
+        $stmtM->execute([$userId]);
+        $memberId = $stmtM->fetchColumn();
+
+        // Lấy danh sách lớp đã đặt
+        $query = "
+            SELECT dc.*, lh.ngay_hoc, lh.gio_bat_dau, lh.gio_ket_thuc, l.ten_lop, l.loai_lop, l.hinh_anh,
+                   COALESCE(u.ho_ten, u.ten_dang_nhap) as ten_hlv
+            FROM DAT_CHO_LOP_HOC dc
+            JOIN LICH_HOC_NHOM lh ON dc.ma_lich = lh.ma_lich
+            JOIN LOP_HOC_NHOM l ON lh.ma_lop = l.ma_lop
+            JOIN HUAN_LUYEN_VIEN h ON lh.ma_hlv = h.ma_hlv
+            JOIN NGUOI_DUNG u ON h.ma_nguoi_dung = u.ma_nguoi_dung
+            WHERE dc.ma_hoi_vien = ?
+            ORDER BY lh.ngay_hoc DESC, lh.gio_bat_dau DESC
+        ";
+        $stmt = $db->prepare($query);
+        $stmt->execute([$memberId]);
+        $allBookings = $stmt->fetchAll();
+
+        // Phân loại Sắp diễn ra vs Lịch sử
+        $upcoming = [];
+        $history = [];
+        $now = date('Y-m-d H:i:s');
+
+        foreach ($allBookings as $b) {
+            $sessionTime = $b['ngay_hoc'] . ' ' . $b['gio_bat_dau'];
+            if ($sessionTime > $now && $b['trang_thai'] === 'thanh_cong') {
+                $upcoming[] = $b;
+            } else {
+                $history[] = $b;
+            }
+        }
+
+        require __DIR__ . '/../views/member/lop-hoc-cua-toi.php';
+    }
+
+    // API Hủy đặt chỗ (AJAX)
+    public function cancelClass() {
+        header('Content-Type: application/json');
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            require_once __DIR__ . '/../database/config.php';
+            $db = Database::getConnection();
+            $userId = $_SESSION['user_id'];
+            
+            $stmtM = $db->prepare("SELECT ma_hoi_vien FROM HOI_VIEN WHERE ma_nguoi_dung = ?");
+            $stmtM->execute([$userId]);
+            $memberId = $stmtM->fetchColumn();
+            
+            $ma_dat_cho = $_POST['ma_dat_cho'] ?? '';
+
+            if ($ma_dat_cho && $memberId) {
+                try {
+                    // Kiểm tra xem có đúng là của mình không và lớp chưa diễn ra
+                    $stmt = $db->prepare("
+                        SELECT dc.ma_dat_cho, lh.ngay_hoc, lh.gio_bat_dau 
+                        FROM DAT_CHO_LOP_HOC dc
+                        JOIN LICH_HOC_NHOM lh ON dc.ma_lich = lh.ma_lich
+                        WHERE dc.ma_dat_cho = ? AND dc.ma_hoi_vien = ?
+                    ");
+                    $stmt->execute([$ma_dat_cho, $memberId]);
+                    $booking = $stmt->fetch();
+
+                    if (!$booking) {
+                        echo json_encode(['success' => false, 'message' => 'Không tìm thấy thông tin đặt chỗ!']);
+                        return;
+                    }
+
+                    $sessionTime = $booking['ngay_hoc'] . ' ' . $booking['gio_bat_dau'];
+                    if ($sessionTime < date('Y-m-d H:i:s')) {
+                        echo json_encode(['success' => false, 'message' => 'Lớp học đã diễn ra, không thể hủy!']);
+                        return;
+                    }
+
+                    // Tiến hành hủy
+                    $stmt = $db->prepare("UPDATE DAT_CHO_LOP_HOC SET trang_thai = 'da_huy' WHERE ma_dat_cho = ?");
+                    $stmt->execute([$ma_dat_cho]);
+                    
+                    echo json_encode(['success' => true, 'message' => 'Đã hủy đặt chỗ thành công!']);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'message' => 'Lỗi hệ thống: ' . $e->getMessage()]);
+                }
+            }
         }
     }
 }

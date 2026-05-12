@@ -19,9 +19,9 @@ function navA(string $href, string $icon, string $label, string $uri): string {
 
 // Xác định group nào đang active để tự mở
 $groupOpen = [
-    'hoivien'   => isActive([SITE_URL.'/admin/members', SITE_URL.'/admin/ban-requests'], $uri),
-    'doanhthu'  => isActive([SITE_URL.'/admin/purchases', SITE_URL.'/admin/payment-management', SITE_URL.'/admin/reports'], $uri),
-    'dichvu'    => isActive([SITE_URL.'/admin/packages', SITE_URL.'/admin/products', SITE_URL.'/admin/promotions'], $uri),
+    'hoivien'   => isActive([SITE_URL.'/admin/members', SITE_URL.'/admin/leads', SITE_URL.'/admin/ban-requests'], $uri),
+    'doanhthu'  => isActive([SITE_URL.'/admin/purchases', SITE_URL.'/admin/payment-management', SITE_URL.'/admin/reports', SITE_URL.'/admin/payroll'], $uri),
+    'dichvu'    => isActive([SITE_URL.'/admin/packages', SITE_URL.'/admin/products', SITE_URL.'/admin/promotions', SITE_URL.'/admin/schedule'], $uri),
     'nhansu'    => isActive([SITE_URL.'/admin/trainers', SITE_URL.'/admin/staff'], $uri),
     'checkin'   => isActive([SITE_URL.'/admin/checkin', SITE_URL.'/admin/attendance-history'], $uri),
     'noidung'   => isActive([SITE_URL.'/admin/reviews', SITE_URL.'/admin/lockers', SITE_URL.'/admin/announcements'], $uri),
@@ -53,6 +53,7 @@ $groupOpen = [
             </div>
             <div class="nav-sub">
                 <?= navA(SITE_URL.'/admin/members', '•', 'Danh Sách', $uri) ?>
+                <?= navA(SITE_URL.'/admin/leads', '•', 'Khách Tiềm Năng', $uri) ?>
                 <?php if ($isAdmin): ?>
                 <?= navA(SITE_URL.'/admin/ban-requests', '•', 'Yêu Cầu Ban', $uri) ?>
                 <?php endif; ?>
@@ -71,6 +72,7 @@ $groupOpen = [
                 <?= navA(SITE_URL.'/admin/payment-management', '•', 'Thanh Toán TT', $uri) ?>
                 <?php if ($isAdmin): ?>
                 <?= navA(SITE_URL.'/admin/reports', '•', 'Báo Cáo', $uri) ?>
+                <?= navA(SITE_URL.'/admin/payroll', '•', 'Bảng Lương', $uri) ?>
                 <?php endif; ?>
             </div>
         </div>
@@ -99,6 +101,7 @@ $groupOpen = [
             <div class="nav-sub">
                 <?= navA(SITE_URL.'/admin/packages', '•', 'Gói Tập', $uri) ?>
                 <?= navA(SITE_URL.'/admin/products', '•', 'Sản Phẩm', $uri) ?>
+                <?= navA(SITE_URL.'/admin/schedule', '•', 'Xếp Lịch Học', $uri) ?>
                 <?= navA(SITE_URL.'/admin/promotions', '•', 'Khuyến Mãi', $uri) ?>
             </div>
         </div>

@@ -139,6 +139,9 @@
                         <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); font-weight: 600;">
                             <span>🗓️ <?= date('H:i, d/m/Y', strtotime($b['ngay_gio_tap'])) ?></span>
                             <span>🏋️ Môn: <?= ucfirst($b['loai_pt']) ?></span>
+                            <?php if($b['trang_thai'] === 'cancelled' && !empty($b['ly_do_huy'])): ?>
+                                <span style="color: #ef4444; font-style: italic;">Lý do: <?= htmlspecialchars($b['ly_do_huy']) ?></span>
+                            <?php endif; ?>
                         </div>
                         <?php if($b['trang_thai'] === 'confirmed' || $b['trang_thai'] === 'pending'): ?>
                             <button class="mg-btn" style="margin-top: 15px; padding: 6px 12px; font-size: 11px; background: #F1F5F9; color: var(--text);" onclick="openCancelModal(<?= $b['ma_lich'] ?>)">Huỷ lịch</button>
@@ -302,17 +305,30 @@
             if (!selHlvId || !selDate) return;
             const data = cachedSchedule[selHlvId] || { bookings: [] };
             
+            const now = new Date();
+
             SLOTS.forEach(s => {
                 if(s.is_break) return;
                 const timeStr = s.bat_dau.substring(0,5);
+                
+                // Kiểm tra xem slot đã có người đặt chưa
                 const isTaken = data.bookings.some(b => b.booking_date === selDate && b.booking_time === timeStr);
                 
+                // Kiểm tra xem slot có trong quá khứ không
+                const slotDateTime = new Date(`${selDate}T${timeStr}:00`);
+                const isPast = slotDateTime < now;
+                
                 const btn = document.createElement('div');
-                btn.className = 'slot-btn' + (isTaken ? ' disabled' : '');
-                btn.onclick = isTaken ? null : () => confirmBooking(timeStr);
+                btn.className = 'slot-btn' + (isTaken || isPast ? ' disabled' : '');
+                btn.onclick = (isTaken || isPast) ? null : () => confirmBooking(timeStr);
+                
+                let statusText = 'CÒN TRỐNG';
+                if (isPast) statusText = 'HẾT HẠN';
+                else if (isTaken) statusText = 'KÍN LỊCH';
+
                 btn.innerHTML = `
                     <span class="s-time">${timeStr}</span>
-                    <span class="s-status">${isTaken ? 'KÍN LỊCH' : 'CÒN TRỐNG'}</span>
+                    <span class="s-status">${statusText}</span>
                 `;
                 grid.appendChild(btn);
             });
