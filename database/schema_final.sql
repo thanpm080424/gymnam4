@@ -80,7 +80,8 @@ CREATE TABLE IF NOT EXISTS DANG_KY_GOI (
 -- 6. THANH_TOAN
 CREATE TABLE IF NOT EXISTS THANH_TOAN (
     ma_thanh_toan INT AUTO_INCREMENT PRIMARY KEY,
-    ma_dang_ky INT NOT NULL,
+    ma_dang_ky INT DEFAULT NULL,
+    ma_yc_thue INT DEFAULT NULL,
     vnp_TxnRef VARCHAR(100) NOT NULL UNIQUE,
     so_tien DECIMAL(12, 2) NOT NULL,
     phuong_thuc ENUM('vnpay', 'cash', 'tien_mat', 'chuyen_khoan', 'the') NOT NULL DEFAULT 'vnpay',
@@ -89,6 +90,7 @@ CREATE TABLE IF NOT EXISTS THANH_TOAN (
     ghi_chu TEXT DEFAULT NULL,
     ngay_thanh_toan DATETIME DEFAULT NULL,
     FOREIGN KEY (ma_dang_ky) REFERENCES DANG_KY_GOI(ma_dang_ky) ON DELETE CASCADE,
+    FOREIGN KEY (ma_yc_thue) REFERENCES YEU_CAU_THUE_TU(ma_yc) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -189,6 +191,7 @@ CREATE TABLE IF NOT EXISTS TU_DO (
     ma_tu INT AUTO_INCREMENT PRIMARY KEY,
     so_tu VARCHAR(20) NOT NULL UNIQUE,
     trang_thai ENUM('trong', 'dang_thue', 'bao_tri') DEFAULT 'trong',
+    loai_tu VARCHAR(10) DEFAULT 'M',
     gia_thue_thang DECIMAL(10,2) NOT NULL DEFAULT 100000,
     ghi_chu VARCHAR(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -199,6 +202,8 @@ CREATE TABLE IF NOT EXISTS YEU_CAU_THUE_TU (
     ma_hoi_vien INT NOT NULL,
     ma_tu INT DEFAULT NULL,
     trang_thai ENUM('pending', 'approved', 'rejected', 'cancelled') DEFAULT 'pending',
+    so_thang INT DEFAULT 1,
+    loai_tu_mong_muon VARCHAR(10) DEFAULT 'M',
     ly_do_tu_choi VARCHAR(255) DEFAULT NULL,
     ngay_bat_dau DATE DEFAULT NULL,
     ngay_ket_thuc DATE DEFAULT NULL,
