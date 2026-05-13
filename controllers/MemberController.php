@@ -473,8 +473,10 @@ class MemberController {
             }
 
             // --- KIỂM TRA TRÙNG LỊCH HLV ---
-            $checkDate = $ngay;
-            $checkTime = $khungGio . ':00';
+            $hlvId = (int)($_POST['ma_hlv'] ?? 0);
+            $checkDate = $ngayTap;
+            // Đảm bảo định dạng HH:MM:SS để khớp với cột TIME trong Database
+            $checkTime = (strlen($gioTap) === 5) ? $gioTap . ':00' : $gioTap;
 
             // 1. Kiểm tra trong LICH_DAT_PT (Trùng với khách PT khác)
             $stmtConflictPT = $db->prepare("
