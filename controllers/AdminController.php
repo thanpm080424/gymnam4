@@ -414,8 +414,21 @@ class AdminController {
         ");
         $productPurchases = $stmt2->fetchAll();
 
+        // 3. Lay hoa don Thue tu do
+        $stmt3 = $db->query("
+            SELECT t.ma_thanh_toan as id, u.ten_dang_nhap as nguoi_mua, t.ghi_chu as mon_hang, 
+                   t.so_tien as gia_tien, t.created_at as ngay_mua, 'thuê tủ' as phan_loai, t.trang_thai as status
+            FROM THANH_TOAN t
+            JOIN YEU_CAU_THUE_TU yc ON t.ma_yc_thue = yc.ma_yc
+            JOIN HOI_VIEN h ON yc.ma_hoi_vien = h.ma_hoi_vien
+            JOIN NGUOI_DUNG u ON h.ma_nguoi_dung = u.ma_nguoi_dung
+            WHERE t.ma_yc_thue IS NOT NULL
+            ORDER BY t.created_at DESC LIMIT 50
+        ");
+        $lockerPurchases = $stmt3->fetchAll();
+
         // Merge array
-        $allPurchases = array_merge($packagePurchases, $productPurchases);
+        $allPurchases = array_merge($packagePurchases, $productPurchases, $lockerPurchases);
         usort($allPurchases, function($a, $b) {
             return strtotime($b['ngay_mua']) - strtotime($a['ngay_mua']);
         });
@@ -714,8 +727,13 @@ class AdminController {
             require_once __DIR__ . '/../database/config.php';
             $db = Database::getConnection();
             try {
-                $db->prepare("INSERT INTO TU_DO (so_tu, ghi_chu) VALUES (?, ?)")
-                   ->execute([trim($_POST['so_tu']), $_POST['ghi_chu'] ?? '']);
+                $db->prepare("INSERT INTO TU_DO (so_tu, ghi_chu, loai_tu, gia_thue_thang) VALUES (?, ?, ?, ?)")
+                   ->execute([
+                       trim($_POST['so_tu']), 
+                       $_POST['ghi_chu'] ?? '',
+                       $_POST['loai_tu'] ?? 'M',
+                       $_POST['gia_thue'] ?? 100000
+                   ]);
                 header("Location: " . SITE_URL . "/admin/lockers?msg=" . urlencode("Đã thêm tủ " . $_POST['so_tu']));
             } catch (PDOException $e) {
                 header("Location: " . SITE_URL . "/admin/lockers?error=" . urlencode("Số tủ đã tồn tại!"));
@@ -730,27 +748,47 @@ class AdminController {
             try {
                 $db->beginTransaction();
                 
-                // 1. LẤY SỐ THÁNG KHÁCH ĐÃ YÊU CẦU
+                $maYc = $_POST['ma_yc'];
+                $maTu = $_POST['ma_tu'];
+
+                // 1. LẤY SỐ THÁNG KHÁCH ĐÃ YÊU CẦU & GIÁ CỦA TỦ ĐƯỢC GÁN
                 $stmtYc = $db->prepare("SELECT so_thang FROM YEU_CAU_THUE_TU WHERE ma_yc = ?");
-                $stmtYc->execute([$_POST['ma_yc']]);
+                $stmtYc->execute([$maYc]);
                 $soThang = $stmtYc->fetchColumn() ?: 1;
+
+                $stmtTu = $db->prepare("SELECT gia_thue_thang, so_tu FROM TU_DO WHERE ma_tu = ?");
+                $stmtTu->execute([$maTu]);
+                $tuInfo = $stmtTu->fetch();
+                $giaThang = $tuInfo['gia_thue_thang'] ?? 100000;
+
+                $tongTien = $giaThang * $soThang;
 
                 // 2. TÍNH TOÁN NGÀY THÁNG
                 $ngayBatDau = date('Y-m-d');
                 $ngayKetThuc = date('Y-m-d', strtotime("+$soThang month"));
                 $maGD = 'TU' . strtoupper(substr(md5(uniqid()), 0, 8));
 
+                // 3. CẬP NHẬT TRẠNG THÁI YÊU CẦU
                 $db->prepare("UPDATE YEU_CAU_THUE_TU SET trang_thai='approved', ma_tu=?, ngay_bat_dau=?, ngay_ket_thuc=?, ma_giao_dich_thue=? WHERE ma_yc=?")
-                   ->execute([$_POST['ma_tu'], $ngayBatDau, $ngayKetThuc, $maGD, $_POST['ma_yc']]);
+                   ->execute([$maTu, $ngayBatDau, $ngayKetThuc, $maGD, $maYc]);
                 
+                // 4. CẬP NHẬT TRẠNG THÁI TỦ ĐỒ
                 $db->prepare("UPDATE TU_DO SET trang_thai='dang_thue' WHERE ma_tu=?")
-                   ->execute([$_POST['ma_tu']]);
+                   ->execute([$maTu]);
+
+                // 5. GHI NHẬN DOANH THU VÀO HỆ THỐNG
+                $db->prepare("INSERT INTO THANH_TOAN (so_tien, phuong_thuc, trang_thai, ma_yc_thue, vnp_TxnRef, ghi_chu, ngay_thanh_toan) VALUES (?, 'tien_mat', 'success', ?, ?, ?, NOW())")
+                   ->execute([
+                       $tongTien, 
+                       $maYc, 
+                       $maGD, 
+                       "Thuê tủ đồ số " . $tuInfo['so_tu'] . " ($soThang tháng)"
+                   ]);
                 
                 $db->commit();
                 
                 // --- Gửi Email xác nhận tủ ---
                 try {
-                    $maYc = (int)$_POST['ma_yc'];
                     $lockerInfo = $db->prepare("
                         SELECT u.ho_ten, u.ten_dang_nhap, u.email, td.so_tu
                         FROM YEU_CAU_THUE_TU yc
@@ -773,10 +811,10 @@ class AdminController {
                     error_log('Locker email error: ' . $emailEx->getMessage());
                 }
                 
-                header("Location: " . SITE_URL . "/admin/lockers?msg=" . urlencode("Đã phân tủ thành công cho $soThang tháng! Ma GD: $maGD"));
+                header("Location: " . SITE_URL . "/admin/lockers?msg=" . urlencode("Đã phân tủ và ghi nhận doanh thu " . number_format($tongTien) . "đ."));
             } catch (Exception $e) {
-                $db->rollBack();
-                header("Location: " . SITE_URL . "/admin/lockers?error=" . urlencode("Lỗi khi phân tủ."));
+                if ($db->inTransaction()) $db->rollBack();
+                header("Location: " . SITE_URL . "/admin/lockers?error=" . urlencode("Lỗi khi xử lý: " . $e->getMessage()));
             }
         }
     }

@@ -42,8 +42,13 @@
                                     <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
                                         Gửi lúc: <?= date('d/m/Y H:i', strtotime($req['created_at'])) ?>
                                     </div>
-                                    <div style="font-size: 11px; font-weight: 800; color: var(--gold-dark); background: rgba(201,153,63,0.1); padding: 2px 8px; border-radius: 4px; display: inline-block; margin-top: 6px;">
-                                        📅 <?= (int)($req['so_thang'] ?? 1) ?> THÁNG
+                                    <div style="display: flex; gap: 6px; margin-top: 6px;">
+                                        <div style="font-size: 11px; font-weight: 800; color: var(--gold-dark); background: rgba(201,153,63,0.1); padding: 2px 8px; border-radius: 4px; display: inline-block;">
+                                            📅 <?= (int)($req['so_thang'] ?? 1) ?> THÁNG
+                                        </div>
+                                        <div style="font-size: 11px; font-weight: 800; color: #3b82f6; background: rgba(59,130,246,0.1); padding: 2px 8px; border-radius: 4px; display: inline-block;">
+                                            📦 SIZE <?= htmlspecialchars($req['loai_tu_mong_muon'] ?? 'M') ?>
+                                        </div>
                                     </div>
                                 </div>
                                 <div style="display: flex; gap: 8px;">
@@ -116,6 +121,9 @@
                     </div>
                     
                     <div style="font-size: 1.2rem; font-weight: 900; color: var(--text-primary);">Tủ <?= htmlspecialchars($l['so_tu']) ?></div>
+                    <div style="margin-top: 8px;">
+                        <span style="font-size: 0.7rem; font-weight: 800; background: #F1F5F9; padding: 2px 8px; border-radius: 4px; color: #64748B;">SIZE <?= $l['loai_tu'] ?></span>
+                    </div>
                     <div style="font-size: 0.9rem; font-weight: 700; color: var(--gold-dark); margin-top: 4px;"><?= number_format($l['gia_thue_thang']) ?>đ/tháng</div>
                     
                     <?php if(!empty($l['ghi_chu'])): ?>
@@ -162,6 +170,20 @@
                 <label>Số tủ (VD: A01, B12)</label>
                 <input type="text" name="so_tu" class="form-control" required placeholder="A01">
             </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="form-group">
+                    <label>Kích thước</label>
+                    <select name="loai_tu" class="form-control" onchange="updatePrice(this.value)">
+                        <option value="S">Size S (Nhỏ)</option>
+                        <option value="M" selected>Size M (Vừa)</option>
+                        <option value="L">Size L (Lớn)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Giá thuê/tháng</label>
+                    <input type="number" name="gia_thue" id="add_gia_thue" class="form-control" value="100000" required>
+                </div>
+            </div>
             <div class="form-group">
                 <label>Ghi chú (Vị trí)</label>
                 <input type="text" name="ghi_chu" class="form-control" placeholder="Dãy A - Khu vực thay đồ nam">
@@ -171,6 +193,12 @@
                 <button type="button" class="btn btn-secondary" style="flex:1;" onclick="document.getElementById('addLockerModal').style.display='none'">Huỷ</button>
             </div>
         </form>
+        <script>
+            function updatePrice(size) {
+                const priceMap = { 'S': 50000, 'M': 100000, 'L': 150000 };
+                document.getElementById('add_gia_thue').value = priceMap[size];
+            }
+        </script>
     </div>
 </div>
 

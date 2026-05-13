@@ -83,9 +83,20 @@
                 <div style="padding: 40px 0;">
                     <div style="font-size: 60px; margin-bottom: 20px; opacity: 0.3;">🔒</div>
                     <p style="color: var(--text-muted); font-size: 15px; font-weight: 600; margin-bottom: 30px;">Bạn chưa có tủ đồ cá nhân.</p>
-                    <div style="background: #FFFBEB; border: 1px dashed #FDE68A; border-radius: 16px; padding: 20px; margin-bottom: 30px;">
-                        <div style="font-size: 24px; font-weight: 900; color: #B45309;">100.000đ <small style="font-size: 12px; font-weight: 600;">/ tháng</small></div>
-                        <div style="font-size: 11px; color: #D97706; font-weight: 700; margin-top: 5px;">THUÊ TỦ CÁ NHÂN TẠI PHÒNG TẬP</div>
+                    <div style="background: #F8FAFC; border: 1px solid var(--border); border-radius: 16px; padding: 15px; margin-bottom: 25px; text-align: left;">
+                        <div style="font-size: 11px; font-weight: 800; color: var(--gold); text-transform: uppercase; margin-bottom: 10px;">BẢNG GIÁ THAM KHẢO</div>
+                        <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px;">
+                            <span>📦 Size S (Nhỏ)</span>
+                            <span style="font-weight: 800;">50.000đ/th</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px;">
+                            <span>📦 Size M (Vừa)</span>
+                            <span style="font-weight: 800;">100.000đ/th</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                            <span>📦 Size L (Lớn)</span>
+                            <span style="font-weight: 800;">150.000đ/th</span>
+                        </div>
                     </div>
                     <?php if ($lockerCount > 0): ?>
                         <button onclick="document.getElementById('requestModal').style.display='flex'" class="mg-btn mg-btn-primary mg-btn-block" style="padding: 16px;">ĐĂNG KÝ THUÊ NGAY 🚀</button>
@@ -143,10 +154,20 @@
             <div style="font-size: 48px; text-align: center; margin-bottom: 20px;">📬</div>
             <h2 style="font-size: 22px; font-weight: 900; text-align: center; margin-bottom: 15px;">Xác nhận thuê tủ đồ</h2>
             <p style="text-align: center; color: var(--text-muted); font-size: 14px; line-height: 1.6; margin-bottom: 30px;">
-                Bạn sẽ đăng ký thuê tủ đồ với mức phí <strong style="color: var(--gold);">100.000đ/tháng</strong>. Yêu cầu sẽ được Staff Monkey Gym duyệt sớm nhất.
+                Vui lòng chọn kích thước và thời gian thuê. Phí thuê chính xác sẽ được nhân viên xác nhận khi duyệt.
             </p>
             <form action="<?= SITE_URL ?>/member/locker/request" method="POST">
                 <?= csrfField('locker_request') ?>
+
+                <!-- Size Select -->
+                <div style="margin-bottom: 15px; text-align: left;">
+                    <label class="mg-form-label">KÍCH THƯỚC TỦ</label>
+                    <select name="loai_tu" class="mg-input" required>
+                        <option value="S">Size S (Nhỏ) - 50k/tháng</option>
+                        <option value="M" selected>Size M (Vừa) - 100k/tháng</option>
+                        <option value="L">Size L (Lớn) - 150k/tháng</option>
+                    </select>
+                </div>
 
                 <!-- Duration Select -->
                 <div style="margin-bottom: 25px; text-align: left;">
@@ -158,7 +179,7 @@
                         <option value="9">9 Tháng</option>
                         <option value="12">1 Năm (VIP)</option>
                     </select>
-                    <p style="font-size: 11px; color: var(--text-muted); margin-top: 6px; font-weight: 600;">* Phí thuê sẽ được tính căn cứ theo số tháng bạn chọn.</p>
+                    <p style="font-size: 11px; color: var(--text-muted); margin-top: 6px; font-weight: 600;">* Phí thuê = (Giá size) x (Số tháng).</p>
                 </div>
 
                 <div style="display: flex; gap: 10px;">

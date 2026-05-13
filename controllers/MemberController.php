@@ -52,7 +52,19 @@ class MemberController {
             $stmtPack->execute([$memberId]);
             $packageOrders = $stmtPack->fetchAll();
 
-            $transactions = array_merge($productOrders, $packageOrders);
+            // Lấy thuê tủ đồ
+            $stmtLock = $db->prepare("
+                SELECT t.ma_thanh_toan, t.created_at as ngay_mua, t.trang_thai, 
+                       t.ghi_chu as ten_sp, t.so_tien as gia_tien, t.vnp_TxnRef as ma_giao_dich, 'locker' as type
+                FROM THANH_TOAN t
+                JOIN YEU_CAU_THUE_TU yc ON t.ma_yc_thue = yc.ma_yc
+                WHERE yc.ma_hoi_vien = ? AND t.ma_yc_thue IS NOT NULL
+                ORDER BY t.created_at DESC
+            ");
+            $stmtLock->execute([$memberId]);
+            $lockerOrders = $stmtLock->fetchAll();
+
+            $transactions = array_merge($productOrders, $packageOrders, $lockerOrders);
             usort($transactions, function($a, $b) {
                 $tA = isset($a['ngay_mua']) ? strtotime($a['ngay_mua']) : 0;
                 $tB = isset($b['ngay_mua']) ? strtotime($b['ngay_mua']) : 0;
@@ -123,7 +135,19 @@ class MemberController {
             $stmtPack->execute([$memberId]);
             $packageOrders = $stmtPack->fetchAll();
 
-            $transactions = array_merge($productOrders, $packageOrders);
+            // Lấy thuê tủ đồ
+            $stmtLock = $db->prepare("
+                SELECT t.ma_thanh_toan, t.created_at as ngay_mua, t.trang_thai, 
+                       t.ghi_chu as ten_sp, t.so_tien as gia_tien, t.vnp_TxnRef as ma_giao_dich, 'locker' as type
+                FROM THANH_TOAN t
+                JOIN YEU_CAU_THUE_TU yc ON t.ma_yc_thue = yc.ma_yc
+                WHERE yc.ma_hoi_vien = ? AND t.ma_yc_thue IS NOT NULL
+                ORDER BY t.created_at DESC
+            ");
+            $stmtLock->execute([$memberId]);
+            $lockerOrders = $stmtLock->fetchAll();
+
+            $transactions = array_merge($productOrders, $packageOrders, $lockerOrders);
             usort($transactions, function($a, $b) {
                 $da = $a['ngay_mua'] ? strtotime($a['ngay_mua']) : 0;
                 $db = $b['ngay_mua'] ? strtotime($b['ngay_mua']) : 0;
@@ -805,70 +829,34 @@ class MemberController {
             $db = Database::getConnection();
             $userId = $_SESSION['user_id'];
 
-            // Lấy số tháng từ form (mặc định là 1 nếu không có)
+            // Lấy số tháng và loại tủ từ form
             $soThang = isset($_POST['so_thang']) ? (int)$_POST['so_thang'] : 1;
+            $loaiTu = $_POST['loai_tu'] ?? 'M';
 
             $stmtM = $db->prepare("SELECT ma_hoi_vien FROM HOI_VIEN WHERE ma_nguoi_dung = ?");
             $stmtM->execute([$userId]);
             $memberId = $stmtM->fetchColumn();
 
-            // Check trùng
+            // Check trùng: Không cho phép gửi thêm yêu cầu nếu đang có yêu cầu chờ hoặc đang sử dụng tủ
             $stmtC = $db->prepare("SELECT COUNT(*) FROM YEU_CAU_THUE_TU WHERE ma_hoi_vien = ? AND trang_thai IN ('pending','approved')");
             $stmtC->execute([$memberId]);
             if ($stmtC->fetchColumn() > 0) {
-                header("Location: " . SITE_URL . "/member/locker?error=" . urlencode("Bạn đã có yêu cầu thuê tủ đang xử lý!"));
+                setFlash('danger', 'Bạn đã có một yêu cầu thuê tủ đang xử lý hoặc đang sử dụng tủ đồ!');
+                header("Location: " . SITE_URL . "/member/locker");
                 return;
             }
 
-            // Tìm tủ trống để cấp tự động
-            $availableLocker = $db->query("SELECT ma_tu, so_tu FROM TU_DO WHERE trang_thai = 'trong' ORDER BY so_tu ASC LIMIT 1")->fetch();
-
-            if ($availableLocker) {
-                try {
-                    $db->beginTransaction();
-                    $maTu = $availableLocker['ma_tu'];
-                    $soTu = $availableLocker['so_tu'];
-                    $ngayBatDau = date('Y-m-d');
-                    $ngayKetThuc = date('Y-m-d', strtotime("+$soThang month"));
-                    $maGD = 'TU' . strtoupper(substr(md5(uniqid()), 0, 8));
-
-                    // Tạo yêu cầu và duyệt luôn, lưu số tháng
-                    $db->prepare("INSERT INTO YEU_CAU_THUE_TU (ma_hoi_vien, ma_tu, trang_thai, ngay_bat_dau, ngay_ket_thuc, ma_giao_dich_thue, so_thang) VALUES (?, ?, 'approved', ?, ?, ?, ?)")
-                       ->execute([$memberId, $maTu, $ngayBatDau, $ngayKetThuc, $maGD, $soThang]);
-                    
-                    // Cập nhật trạng thái tủ
-                    $db->prepare("UPDATE TU_DO SET trang_thai='dang_thue' WHERE ma_tu=?")
-                       ->execute([$maTu]);
-                    
-                    $db->commit();
-                    
-                    // --- Gửi Email xác nhận thuê tủ ---
-                    try {
-                        $stmtU = $db->prepare("SELECT u.ho_ten, u.ten_dang_nhap, u.email FROM NGUOI_DUNG u WHERE u.ma_nguoi_dung = ?");
-                        $stmtU->execute([$userId]);
-                        $uInfo = $stmtU->fetch();
-                        if ($uInfo) {
-                            $memEmail = !empty($uInfo['email']) ? $uInfo['email'] : $uInfo['ten_dang_nhap'];
-                            $memName  = !empty($uInfo['ho_ten']) ? $uInfo['ho_ten'] : $uInfo['ten_dang_nhap'];
-                            if (filter_var($memEmail, FILTER_VALIDATE_EMAIL)) {
-                                $emailService = new EmailService();
-                                $emailService->sendLockerConfirmation($memEmail, $memName, $soTu, $ngayBatDau, $ngayKetThuc, 'approved');
-                            }
-                        }
-                    } catch (Exception $e) {
-                        error_log('Failed to send locker email: ' . $e->getMessage());
-                    }
-                    
-                    header("Location: " . SITE_URL . "/member/locker?msg=" . urlencode("Chúc mừng! Bạn đã được cấp tủ số $soTu tự động cho thời hạn $soThang tháng."));
-                    return;
-                } catch (Exception $e) {
-                    $db->rollBack();
-                }
+            // LUỒNG CHUỒN: Mọi yêu cầu đều phải ở trạng thái PENDING để Staff kiểm tra và gán tủ
+            try {
+                $db->prepare("INSERT INTO YEU_CAU_THUE_TU (ma_hoi_vien, trang_thai, so_thang, loai_tu_mong_muon) VALUES (?, 'pending', ?, ?)")
+                   ->execute([$memberId, $soThang, $loaiTu]);
+                
+                setFlash('success', "Gửi yêu cầu thuê tủ (Size $loaiTu - $soThang tháng) thành công! Vui lòng liên hệ quầy lễ tân để hoàn tất thanh toán và nhận số tủ.");
+                header("Location: " . SITE_URL . "/member/locker");
+            } catch (Exception $e) {
+                setFlash('danger', 'Lỗi hệ thống khi gửi yêu cầu. Vui lòng thử lại sau.');
+                header("Location: " . SITE_URL . "/member/locker");
             }
-
-            // Nếu không có tủ trống hoặc lỗi, chuyển sang luồng pending
-            $db->prepare("INSERT INTO YEU_CAU_THUE_TU (ma_hoi_vien, so_thang) VALUES (?, ?)")->execute([$memberId, $soThang]);
-            header("Location: " . SITE_URL . "/member/locker?msg=" . urlencode("Đã gửi yêu cầu thuê tủ ($soThang tháng)! Hiện tại hết tủ trống, Staff sẽ sắp xếp cho bạn sớm nhất."));
         }
     }
 
