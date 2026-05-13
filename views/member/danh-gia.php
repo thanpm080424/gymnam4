@@ -41,6 +41,24 @@
     </div>
     <?php endif; ?>
 
+    <?php if (!empty($suggestedSession)): ?>
+        <div class="animate-up" style="background: rgba(132, 204, 22, 0.1); border: 1px solid #84cc16; border-radius: 20px; padding: 24px; margin-bottom: 2.5rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 30px rgba(132, 204, 22, 0.15); border-left: 6px solid #84cc16;">
+            <div>
+                <h3 style="color: #4d7c0f; margin: 0 0 6px 0; font-size: 1.25rem; font-weight: 900;">✨ Bạn vừa hoàn thành buổi tập!</h3>
+                <p style="color: var(--text); margin: 0; font-size: 0.95rem; font-weight: 500;">
+                    Buổi tập với HLV <strong><?= htmlspecialchars($suggestedSession['ten_hlv']) ?></strong> 
+                    vào lúc <span style="color: #84cc16; font-weight: 700;"><?= date('H:i - d/m/Y', strtotime($suggestedSession['ngay_gio_tap'])) ?></span> vừa rồi thế nào?
+                </p>
+            </div>
+            
+            <button onclick="openReviewForm(<?= $suggestedSession['ma_hlv'] ?>, '<?= addslashes($suggestedSession['ten_hlv']) ?>', null)" 
+                    class="mg-btn"
+                    style="background: #84cc16; color: #fff; font-weight: 800; border: none; padding: 12px 24px; border-radius: 12px; cursor: pointer; transition: 0.3s; box-shadow: 0 4px 15px rgba(132, 204, 22, 0.4); white-space: nowrap;">
+                Đánh giá ngay ⭐️
+            </button>
+        </div>
+    <?php endif; ?>
+
     <div class="review-grid animate-up">
         <?php if (empty($trainedBy)): ?>
             <div class="empty-state">

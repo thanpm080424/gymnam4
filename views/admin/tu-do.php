@@ -39,7 +39,12 @@
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <div>
                                     <div style="font-weight: 800; color: var(--text-primary);"><?= htmlspecialchars($req['ten_dang_nhap']) ?></div>
-                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Gửi lúc: <?= date('d/m/Y H:i', strtotime($req['created_at'])) ?></div>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                                        Gửi lúc: <?= date('d/m/Y H:i', strtotime($req['created_at'])) ?>
+                                    </div>
+                                    <div style="font-size: 11px; font-weight: 800; color: var(--gold-dark); background: rgba(201,153,63,0.1); padding: 2px 8px; border-radius: 4px; display: inline-block; margin-top: 6px;">
+                                        📅 <?= (int)($req['so_thang'] ?? 1) ?> THÁNG
+                                    </div>
                                 </div>
                                 <div style="display: flex; gap: 8px;">
                                     <button class="btn btn-primary btn-sm" onclick="openApprove(<?= $req['ma_yc'] ?>)">✅ Duyệt</button>

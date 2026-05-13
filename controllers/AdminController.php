@@ -729,14 +729,23 @@ class AdminController {
             $db = Database::getConnection();
             try {
                 $db->beginTransaction();
+                
+                // 1. LẤY SỐ THÁNG KHÁCH ĐÃ YÊU CẦU
+                $stmtYc = $db->prepare("SELECT so_thang FROM YEU_CAU_THUE_TU WHERE ma_yc = ?");
+                $stmtYc->execute([$_POST['ma_yc']]);
+                $soThang = $stmtYc->fetchColumn() ?: 1;
+
+                // 2. TÍNH TOÁN NGÀY THÁNG
                 $ngayBatDau = date('Y-m-d');
-                $ngayKetThuc = date('Y-m-d', strtotime('+1 month'));
+                $ngayKetThuc = date('Y-m-d', strtotime("+$soThang month"));
                 $maGD = 'TU' . strtoupper(substr(md5(uniqid()), 0, 8));
 
                 $db->prepare("UPDATE YEU_CAU_THUE_TU SET trang_thai='approved', ma_tu=?, ngay_bat_dau=?, ngay_ket_thuc=?, ma_giao_dich_thue=? WHERE ma_yc=?")
                    ->execute([$_POST['ma_tu'], $ngayBatDau, $ngayKetThuc, $maGD, $_POST['ma_yc']]);
+                
                 $db->prepare("UPDATE TU_DO SET trang_thai='dang_thue' WHERE ma_tu=?")
                    ->execute([$_POST['ma_tu']]);
+                
                 $db->commit();
                 
                 // --- Gửi Email xác nhận tủ ---
@@ -764,10 +773,10 @@ class AdminController {
                     error_log('Locker email error: ' . $emailEx->getMessage());
                 }
                 
-                    header("Location: " . SITE_URL . "/admin/lockers?msg=" . urlencode("Da phan tu thanh cong! Ma GD: $maGD"));
+                header("Location: " . SITE_URL . "/admin/lockers?msg=" . urlencode("Đã phân tủ thành công cho $soThang tháng! Ma GD: $maGD"));
             } catch (Exception $e) {
                 $db->rollBack();
-                    header("Location: " . SITE_URL . "/admin/lockers?error=" . urlencode("Loi phan tu."));
+                header("Location: " . SITE_URL . "/admin/lockers?error=" . urlencode("Lỗi khi phân tủ."));
             }
         }
     }
@@ -1816,16 +1825,29 @@ class AdminController {
         $dbMonth = date('Y-m'); 
 
         try {
-            $db->prepare("DELETE FROM BANG_LUONG WHERE thang_nam = ? AND trang_thai = 'chua_thanh_toan'")->execute([$month]);
             $trainers = $db->query("SELECT * FROM HUAN_LUYEN_VIEN")->fetchAll();
             
             foreach ($trainers as $t) {
-                // Đếm số buổi Lớp nhóm
+                // 1. KIỂM TRA: HLV này đã được thanh toán lương tháng này chưa?
+                $stmtCheck = $db->prepare("SELECT ma_luong, trang_thai FROM BANG_LUONG WHERE ma_hlv = ? AND thang_nam = ? ORDER BY ma_luong DESC LIMIT 1");
+                $stmtCheck->execute([$t['ma_hlv'], $month]);
+                $existing = $stmtCheck->fetch();
+
+                // Nếu ĐÃ THANH TOÁN -> Bỏ qua, tuyệt đối không tính lại để tránh nhân đôi lương cứng
+                if ($existing && $existing['trang_thai'] === 'da_thanh_toan') {
+                    continue; 
+                }
+
+                // Nếu có bản nháp (CHƯA THANH TOÁN) -> Xóa đi để tính lại bản mới (Cập nhật số buổi mới nhất)
+                if ($existing && $existing['trang_thai'] === 'chua_thanh_toan') {
+                    $db->prepare("DELETE FROM BANG_LUONG WHERE ma_luong = ?")->execute([$existing['ma_luong']]);
+                }
+
+                // 2. ĐẾM SỐ BUỔI DẠY (Lớp Nhóm + PT)
                 $stmtCountGroup = $db->prepare("SELECT COUNT(*) as tong_buoi FROM LICH_HOC_NHOM WHERE ma_hlv = ? AND DATE_FORMAT(ngay_hoc, '%Y-%m') = ?");
                 $stmtCountGroup->execute([$t['ma_hlv'], $dbMonth]);
                 $so_buoi_nhom = $stmtCountGroup->fetch()['tong_buoi'] ?? 0;
                 
-                // Đếm số buổi PT (Chỉ tính các buổi đã xác nhận, hoàn thành hoặc đã tập)
                 $stmtCountPT = $db->prepare("
                     SELECT COUNT(*) as tong_buoi 
                     FROM LICH_DAT_PT 
@@ -1838,6 +1860,7 @@ class AdminController {
 
                 $so_buoi = $so_buoi_nhom + $so_buoi_pt;
                 
+                // 3. TÍNH TIỀN VÀ LƯU VÀO DB
                 $thuong = $so_buoi * ($t['gia_buoi_day'] ?? 150000);
                 $tong = ($t['luong_cung'] ?? 5000000) + $thuong;
                 

@@ -147,6 +147,20 @@
             </p>
             <form action="<?= SITE_URL ?>/member/locker/request" method="POST">
                 <?= csrfField('locker_request') ?>
+
+                <!-- Duration Select -->
+                <div style="margin-bottom: 25px; text-align: left;">
+                    <label class="mg-form-label">THỜI GIAN THUÊ MONG MUỐN</label>
+                    <select name="so_thang" class="mg-input" required>
+                        <option value="1">1 Tháng (Cơ bản)</option>
+                        <option value="3" selected>3 Tháng (Tiết kiệm)</option>
+                        <option value="6">6 Tháng (Phổ biến)</option>
+                        <option value="9">9 Tháng</option>
+                        <option value="12">1 Năm (VIP)</option>
+                    </select>
+                    <p style="font-size: 11px; color: var(--text-muted); margin-top: 6px; font-weight: 600;">* Phí thuê sẽ được tính căn cứ theo số tháng bạn chọn.</p>
+                </div>
+
                 <div style="display: flex; gap: 10px;">
                     <button type="button" class="mg-btn" style="flex: 1; background: #F1F5F9;" onclick="document.getElementById('requestModal').style.display='none'">HỦY</button>
                     <button type="submit" class="mg-btn mg-btn-primary" style="flex: 2;">XÁC NHẬN GỬI ✨</button>

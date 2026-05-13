@@ -805,6 +805,9 @@ class MemberController {
             $db = Database::getConnection();
             $userId = $_SESSION['user_id'];
 
+            // Lấy số tháng từ form (mặc định là 1 nếu không có)
+            $soThang = isset($_POST['so_thang']) ? (int)$_POST['so_thang'] : 1;
+
             $stmtM = $db->prepare("SELECT ma_hoi_vien FROM HOI_VIEN WHERE ma_nguoi_dung = ?");
             $stmtM->execute([$userId]);
             $memberId = $stmtM->fetchColumn();
@@ -826,12 +829,12 @@ class MemberController {
                     $maTu = $availableLocker['ma_tu'];
                     $soTu = $availableLocker['so_tu'];
                     $ngayBatDau = date('Y-m-d');
-                    $ngayKetThuc = date('Y-m-d', strtotime('+1 month'));
+                    $ngayKetThuc = date('Y-m-d', strtotime("+$soThang month"));
                     $maGD = 'TU' . strtoupper(substr(md5(uniqid()), 0, 8));
 
-                    // Tạo yêu cầu và duyệt luôn
-                    $db->prepare("INSERT INTO YEU_CAU_THUE_TU (ma_hoi_vien, ma_tu, trang_thai, ngay_bat_dau, ngay_ket_thuc, ma_giao_dich_thue) VALUES (?, ?, 'approved', ?, ?, ?)")
-                       ->execute([$memberId, $maTu, $ngayBatDau, $ngayKetThuc, $maGD]);
+                    // Tạo yêu cầu và duyệt luôn, lưu số tháng
+                    $db->prepare("INSERT INTO YEU_CAU_THUE_TU (ma_hoi_vien, ma_tu, trang_thai, ngay_bat_dau, ngay_ket_thuc, ma_giao_dich_thue, so_thang) VALUES (?, ?, 'approved', ?, ?, ?, ?)")
+                       ->execute([$memberId, $maTu, $ngayBatDau, $ngayKetThuc, $maGD, $soThang]);
                     
                     // Cập nhật trạng thái tủ
                     $db->prepare("UPDATE TU_DO SET trang_thai='dang_thue' WHERE ma_tu=?")
@@ -856,17 +859,16 @@ class MemberController {
                         error_log('Failed to send locker email: ' . $e->getMessage());
                     }
                     
-                    header("Location: " . SITE_URL . "/member/locker?msg=" . urlencode("Chúc mừng! Bạn đã được cấp tủ số $soTu tự động."));
+                    header("Location: " . SITE_URL . "/member/locker?msg=" . urlencode("Chúc mừng! Bạn đã được cấp tủ số $soTu tự động cho thời hạn $soThang tháng."));
                     return;
                 } catch (Exception $e) {
                     $db->rollBack();
-                    // Nếu lỗi thì quay về luồng pending cũ
                 }
             }
 
             // Nếu không có tủ trống hoặc lỗi, chuyển sang luồng pending
-            $db->prepare("INSERT INTO YEU_CAU_THUE_TU (ma_hoi_vien) VALUES (?)")->execute([$memberId]);
-            header("Location: " . SITE_URL . "/member/locker?msg=" . urlencode("Đã gửi yêu cầu thuê tủ! Hiện tại hết tủ trống, Staff sẽ sắp xếp cho bạn sớm nhất."));
+            $db->prepare("INSERT INTO YEU_CAU_THUE_TU (ma_hoi_vien, so_thang) VALUES (?, ?)")->execute([$memberId, $soThang]);
+            header("Location: " . SITE_URL . "/member/locker?msg=" . urlencode("Đã gửi yêu cầu thuê tủ ($soThang tháng)! Hiện tại hết tủ trống, Staff sẽ sắp xếp cho bạn sớm nhất."));
         }
     }
 
@@ -900,6 +902,26 @@ class MemberController {
             $t['existing_review'] = $stmtR->fetch() ?: null;
             $trainedBy[] = $t;
         }
+
+        // [SMART SUGGESTION] Tìm buổi tập gần nhất chưa đánh giá
+        $stmtSuggest = $db->prepare("
+            SELECT l.ma_hlv, COALESCE(u.ho_ten, u.ten_dang_nhap) as ten_hlv, l.ngay_gio_tap 
+            FROM LICH_DAT_PT l
+            JOIN HUAN_LUYEN_VIEN h ON l.ma_hlv = h.ma_hlv
+            JOIN NGUOI_DUNG u ON h.ma_nguoi_dung = u.ma_nguoi_dung
+            WHERE l.ma_hoi_vien = ? 
+              AND l.ngay_gio_tap < NOW() 
+              AND l.trang_thai IN ('confirmed', 'completed', 'attended') 
+              AND NOT EXISTS (
+                  SELECT 1 FROM DANH_GIA_HLV d 
+                  WHERE d.ma_hoi_vien = l.ma_hoi_vien 
+                    AND d.ma_hlv = l.ma_hlv 
+                    AND d.created_at >= l.ngay_gio_tap 
+              )
+            ORDER BY l.ngay_gio_tap DESC LIMIT 1
+        ");
+        $stmtSuggest->execute([$memberId]);
+        $suggestedSession = $stmtSuggest->fetch();
 
         require __DIR__ . '/../views/member/danh-gia.php';
     }

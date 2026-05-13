@@ -72,7 +72,8 @@ class TrainerController {
         $stmtAvg->execute([$ma_hlv]);
         $avgStar = round($stmtAvg->fetchColumn() ?: 0, 1);
 
-        require __DIR__ . '/../views/trainer/dashboard.php';
+        $bookings = $ptBookings; 
+        require __DIR__ . '/../views/trainer/bang-dieu-khien.php';
     }
 
     public function myPayroll() {
@@ -450,6 +451,148 @@ class TrainerController {
             
             setFlash('success', 'Đã lưu ghi chú về học viên.');
             header('Location: ' . $_SERVER['HTTP_REFERER']);
+        }
+    }
+
+    /**
+     * CHỮA LỖI 1: Xử lý Nhận / Từ chối lịch hẹn mới (từ trang Dashboard)
+     */
+    public function resolveBooking() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            require_once __DIR__ . '/../database/config.php';
+            $db = Database::getConnection();
+            $userId = $_SESSION['user_id'];
+            $ma_lich = (int)($_POST['ma_lich'] ?? 0);
+            $action = $_POST['action'] ?? ''; // 'accept' hoặc 'reject'
+
+            // Lấy ma_hlv để bảo mật
+            $stmtH = $db->prepare("SELECT ma_hlv FROM HUAN_LUYEN_VIEN WHERE ma_nguoi_dung = ?");
+            $stmtH->execute([$userId]);
+            $ma_hlv = $stmtH->fetchColumn();
+
+            if ($action === 'accept') {
+                $stmt = $db->prepare("UPDATE LICH_DAT_PT SET trang_thai = 'confirmed' WHERE ma_lich = ? AND ma_hlv = ?");
+                $stmt->execute([$ma_lich, $ma_hlv]);
+                setFlash('success', 'Đã xác nhận nhận lịch dạy thành công!');
+            } elseif ($action === 'reject') {
+                $db->beginTransaction();
+                try {
+                    // 1. Lấy mã hội viên của lịch này
+                    $stmtGet = $db->prepare("SELECT ma_hoi_vien FROM LICH_DAT_PT WHERE ma_lich = ? AND ma_hlv = ?");
+                    $stmtGet->execute([$ma_lich, $ma_hlv]);
+                    $ma_hv = $stmtGet->fetchColumn();
+
+                    if ($ma_hv) {
+                        // 2. Hủy lịch
+                        $db->prepare("UPDATE LICH_DAT_PT SET trang_thai = 'cancelled', ly_do_huy = 'HLV từ chối nhận lịch' WHERE ma_lich = ? AND ma_hlv = ?")
+                           ->execute([$ma_lich, $ma_hlv]);
+
+                        // 3. Hoàn lại buổi tập cho khách
+                        $db->prepare("UPDATE HOI_VIEN SET so_buoi_pt_con_lai = so_buoi_pt_con_lai + 1 WHERE ma_hoi_vien = ?")
+                           ->execute([$ma_hv]);
+
+                        $db->commit();
+                        setFlash('warning', 'Đã từ chối lịch. Hệ thống đã hoàn lại buổi tập cho học viên.');
+                    }
+                } catch (Exception $e) {
+                    $db->rollBack();
+                    setFlash('danger', 'Lỗi khi từ chối lịch.');
+                }
+            }
+            header('Location: ' . SITE_URL . '/trainer/dashboard');
+        }
+    }
+
+    /**
+     * CHỮA LỖI 2: Xử lý Chấp nhận / Phạt khi khách xin hủy lịch
+     */
+    public function resolveCancel() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            require_once __DIR__ . '/../database/config.php';
+            $db = Database::getConnection();
+            $userId = $_SESSION['user_id'];
+            $ma_lich = (int)($_POST['ma_lich'] ?? 0);
+            $action = $_POST['action'] ?? ''; // 'accept_cancel' hoặc 'reject_cancel'
+
+            $stmtH = $db->prepare("SELECT ma_hlv FROM HUAN_LUYEN_VIEN WHERE ma_nguoi_dung = ?");
+            $stmtH->execute([$userId]);
+            $ma_hlv = $stmtH->fetchColumn();
+
+            if ($action === 'accept_cancel') {
+                $db->beginTransaction();
+                try {
+                    $stmtGet = $db->prepare("SELECT ma_hoi_vien FROM LICH_DAT_PT WHERE ma_lich = ? AND ma_hlv = ?");
+                    $stmtGet->execute([$ma_lich, $ma_hlv]);
+                    $ma_hv = $stmtGet->fetchColumn();
+
+                    if ($ma_hv) {
+                        // Đổi trạng thái thành đã hủy
+                        $db->prepare("UPDATE LICH_DAT_PT SET trang_thai = 'cancelled' WHERE ma_lich = ? AND ma_hlv = ?")
+                           ->execute([$ma_lich, $ma_hlv]);
+
+                        // Hoàn buổi tập
+                        $db->prepare("UPDATE HOI_VIEN SET so_buoi_pt_con_lai = so_buoi_pt_con_lai + 1 WHERE ma_hoi_vien = ?")
+                           ->execute([$ma_hv]);
+
+                        $db->commit();
+                        setFlash('success', 'Đã chấp nhận yêu cầu hủy. Học viên không bị trừ buổi.');
+                    }
+                } catch (Exception $e) {
+                    $db->rollBack();
+                    setFlash('danger', 'Lỗi hệ thống.');
+                }
+            } elseif ($action === 'reject_cancel') {
+                // Bác bỏ lý do hủy -> Khách bị mất buổi (Phạt)
+                $db->prepare("UPDATE LICH_DAT_PT SET trang_thai = 'cancel_rejected' WHERE ma_lich = ? AND ma_hlv = ?")
+                   ->execute([$ma_lich, $ma_hlv]);
+                setFlash('danger', 'Đã bác bỏ yêu cầu hủy. Học viên sẽ bị trừ mất buổi tập này!');
+            }
+            header('Location: ' . SITE_URL . '/trainer/dashboard');
+        }
+    }
+
+    /**
+     * Chức năng: Cập nhật giờ hoặc ghi chú cho lịch đã xếp
+     */
+    public function scheduleUpdate() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            require_once __DIR__ . '/../database/config.php';
+            $db = Database::getConnection();
+            $userId = $_SESSION['user_id'];
+            
+            $ma_lich = (int)($_POST['ma_lich'] ?? 0);
+            $ghi_chu = $_POST['ghi_chu'] ?? '';
+            $gio_tap_moi = $_POST['gio_tap'] ?? ''; // Nếu cho phép đổi giờ
+
+            // Lấy ma_hlv để đảm bảo chỉ sửa lịch của mình
+            $stmtH = $db->prepare("SELECT ma_hlv FROM HUAN_LUYEN_VIEN WHERE ma_nguoi_dung = ?");
+            $stmtH->execute([$userId]);
+            $ma_hlv = $stmtH->fetchColumn();
+
+            if ($ma_lich && $ma_hlv) {
+                try {
+                    $sql = "UPDATE LICH_DAT_PT SET ghi_chu = ?";
+                    $params = [$ghi_chu];
+                    
+                    if (!empty($gio_tap_moi)) {
+                        // Cập nhật lại phần giờ trong ngay_gio_tap
+                        $sql .= ", ngay_gio_tap = CONCAT(DATE(ngay_gio_tap), ' ', ?)";
+                        $params[] = $gio_tap_moi . ':00';
+                    }
+                    
+                    $sql .= " WHERE ma_lich = ? AND ma_hlv = ?";
+                    $params[] = $ma_lich;
+                    $params[] = $ma_hlv;
+
+                    $stmt = $db->prepare($sql);
+                    $stmt->execute($params);
+                    
+                    setFlash('success', 'Đã cập nhật lịch hẹn thành công!');
+                } catch (Exception $e) {
+                    setFlash('danger', 'Lỗi khi cập nhật lịch.');
+                }
+            }
+            header('Location: ' . SITE_URL . '/trainer/schedule');
         }
     }
 }
