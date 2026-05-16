@@ -7,10 +7,20 @@
 // ============================================================================
 // DATABASE CONFIGURATION
 // ============================================================================
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'monkey_gym');
+if ($_SERVER['HTTP_HOST'] === 'localhost' || $_SERVER['HTTP_HOST'] === '127.0.0.1') {
+    // Local environment (WAMP/XAMPP)
+    define('DB_HOST', 'localhost');
+    define('DB_USER', 'root');
+    define('DB_PASS', '');
+    define('DB_NAME', 'monkey_gym');
+} else {
+    // Online environment (InfinityFree / Hosting)
+    // HÃY THAY ĐỔI CÁC THÔNG SỐ DƯỚI ĐÂY THEO THÔNG TIN HOSTING CỦA BẠN
+    define('DB_HOST', 'sqlxxx.infinityfree.com'); // Ví dụ: sql311.infinityfree.com
+    define('DB_USER', 'if0_xxxxxxx');            // Tên user MySQL
+    define('DB_PASS', 'your_password');          // Mật khẩu MySQL
+    define('DB_NAME', 'if0_xxxxxxx_monkey_gym'); // Tên database
+}
 define('DB_CHARSET', 'utf8mb4');
 
 // ============================================================================
