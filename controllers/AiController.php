@@ -90,10 +90,11 @@ QUY TẮC PHẢN HỒI:
 1. Trả lời tự nhiên, KHÔNG máy móc. Đừng liệt kê cứng nhắc trừ khi người dùng yêu cầu.
 2. Ưu tiên giải quyết vấn đề của hội viên bằng dữ liệu thực tế được cung cấp.
 3. Nếu người dùng hỏi ngoài lề (đời sống, triết lý), hãy trả lời thông minh nhưng luôn hướng họ về việc tập luyện (vd: "Buồn thì đi tập gym cho khỏe bạn ơi!").
-4. CẤU TRÚC ĐẦU RA BẮT BUỘC:
-   - Phần 1: Câu trả lời tự nhiên cho người dùng.
-   - Phần 2: Luôn kết thúc bằng chuỗi phân cách `---METADATA---`
-   - Phần 3: Một khối JSON chứa `action` và `suggestions`.
+4. CẤU TRÚC ĐẦU RA BẮT BUỘC (QUAN TRỌNG):
+   - Bước 1: Viết câu trả lời tự nhiên cho người dùng.
+   - Bước 2: Viết chuỗi phân cách chính xác là `---METADATA---`.
+   - Bước 3: Viết một khối JSON hợp lệ chứa `action` và `suggestions`.
+   Lưu ý: Tuyệt đối không viết thêm bất kỳ văn bản nào sau khối JSON.
 
 ĐỊNH DẠNG METADATA JSON:
 {
@@ -118,13 +119,14 @@ PROMPT;
         }
         $contents[] = ['role' => 'user', 'parts' => [['text' => $message]]];
 
-        $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" . $geminiApiKey;
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" . $geminiApiKey;
         $payload = json_encode([
             'systemInstruction' => ['parts' => [['text' => $sysPrompt]]],
             'contents'          => $contents,
             'generationConfig'  => [
-                'maxOutputTokens'  => 1000,
-                'temperature'      => 0.85,
+                'maxOutputTokens'  => 1500,
+                'temperature'      => 0.7,
+                'topP'             => 0.9,
             ],
         ]);
 
@@ -166,7 +168,11 @@ PROMPT;
                     'suggestions' => $meta['suggestions'] ?? []
                 ]);
                 exit;
+            } else {
+                error_log("[AiController] Empty response from Gemini. Response: " . $response);
             }
+        } else {
+            error_log("[AiController] API Call Failed. Error: $curlErr. Response: $response");
         }
 
         // ── Fallback ────────────────────────────────────────────────────────────

@@ -101,7 +101,7 @@ define('MAX_UPLOAD_SIZE', 5 * 1024 * 1024); // 5MB
 // ============================================================================
 // AI & EXTERNAL SERVICES
 // ============================================================================
-define('GEMINI_API_KEY', 'AIzaSyDh1jxn02x2bNRudpbt2ETxf7lMJ_O4MT0'); // Chú ý: Nên chuyển sang biến môi trường nếu có thể
+define('GEMINI_API_KEY', 'AIzaSyCf7oLiSrfd6ZULKLKmuCpX2NVhXI6lGbc'); // Chú ý: Nên chuyển sang biến môi trường nếu có thể
 
 // ============================================================================
 // SECURITY
