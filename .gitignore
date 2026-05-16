@@ -1,0 +1,19 @@
+# Logs
+logs/*.log
+*.log
+
+# Databases (if any local exports)
+database/*.sql.bak
+*.sql.gz
+
+# IDEs
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Private files
+.env
+config/config.php.local

@@ -119,7 +119,7 @@ PROMPT;
         }
         $contents[] = ['role' => 'user', 'parts' => [['text' => $message]]];
 
-        $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" . $geminiApiKey;
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" . $geminiApiKey;
         $payload = json_encode([
             'systemInstruction' => ['parts' => [['text' => $sysPrompt]]],
             'contents'          => $contents,

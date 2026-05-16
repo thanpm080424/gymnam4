@@ -874,15 +874,14 @@ class MemberController {
         $stmtM->execute([$userId]);
         $memberId = $stmtM->fetchColumn();
 
-        // Lấy danh sách HLV đã có lịch confirmed/completed
+        // Lấy TẤT CẢ Huấn luyện viên đang hoạt động (Không cần biết đã tập hay chưa)
         $stmtT = $db->prepare("
-            SELECT DISTINCT h.ma_hlv, u.ten_dang_nhap, h.chuyen_mon, h.anh_dai_dien
-            FROM LICH_DAT_PT l
-            JOIN HUAN_LUYEN_VIEN h ON l.ma_hlv = h.ma_hlv
+            SELECT h.ma_hlv, u.ten_dang_nhap, h.chuyen_mon, h.anh_dai_dien
+            FROM HUAN_LUYEN_VIEN h
             JOIN NGUOI_DUNG u ON h.ma_nguoi_dung = u.ma_nguoi_dung
-            WHERE l.ma_hoi_vien = ? AND l.trang_thai IN ('confirmed', 'completed', 'cancelled', 'cancel_rejected')
+            WHERE u.trang_thai = 'active'
         ");
-        $stmtT->execute([$memberId]);
+        $stmtT->execute();
         $rawTrainers = $stmtT->fetchAll();
 
         $trainedBy = [];

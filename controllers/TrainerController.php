@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/../utils/Middleware.php';
+require_once __DIR__ . '/../includes/EmailService.php';
+
 
 class TrainerController {
     public function __construct() {
@@ -281,14 +283,24 @@ class TrainerController {
             $stmt = $db->prepare("UPDATE LICH_DAT_PT SET trang_thai = 'confirmed' WHERE ma_lich = ? AND ma_hlv = ?");
             $msg = "Đã xác nhận lịch hẹn";
             $stmt->execute([$ma_lich, $ma_hlv]);
+
+            // Gửi mail cho khách xác nhận
+            $info = $db->prepare("SELECT u.email, u.ho_ten, l.ngay_gio_tap, u_hlv.ho_ten as ten_hlv FROM LICH_DAT_PT l JOIN HOI_VIEN hv ON l.ma_hoi_vien = hv.ma_hoi_vien JOIN NGUOI_DUNG u ON hv.ma_nguoi_dung = u.ma_nguoi_dung JOIN HUAN_LUYEN_VIEN hlv ON l.ma_hlv = hlv.ma_hlv JOIN NGUOI_DUNG u_hlv ON hlv.ma_nguoi_dung = u_hlv.ma_nguoi_dung WHERE l.ma_lich = ?");
+            $info->execute([$ma_lich]);
+            $bk = $info->fetch();
+            if ($bk && $bk['email'] && filter_var($bk['email'], FILTER_VALIDATE_EMAIL)) {
+                $emailService = new EmailService();
+                $emailService->sendPTBookingStatus($bk['email'], $bk['ho_ten'], $bk['ten_hlv'], $bk['ngay_gio_tap'], 'confirmed');
+            }
         } else {
             // Khi HLV hủy hoặc từ chối -> Phải hoàn lại buổi tập cho hội viên
             $db->beginTransaction();
             try {
-                // 1. Lấy ma_hoi_vien của lịch này
-                $stmtGet = $db->prepare("SELECT ma_hoi_vien FROM LICH_DAT_PT WHERE ma_lich = ? AND ma_hlv = ?");
-                $stmtGet->execute([$ma_lich, $ma_hlv]);
-                $ma_hv = $stmtGet->fetchColumn();
+                // 1. Lấy thông tin lịch để gửi mail
+                $info = $db->prepare("SELECT u.email, u.ho_ten, l.ngay_gio_tap, u_hlv.ho_ten as ten_hlv, l.ma_hoi_vien FROM LICH_DAT_PT l JOIN HOI_VIEN hv ON l.ma_hoi_vien = hv.ma_hoi_vien JOIN NGUOI_DUNG u ON hv.ma_nguoi_dung = u.ma_nguoi_dung JOIN HUAN_LUYEN_VIEN hlv ON l.ma_hlv = hlv.ma_hlv JOIN NGUOI_DUNG u_hlv ON hlv.ma_nguoi_dung = u_hlv.ma_nguoi_dung WHERE l.ma_lich = ?");
+                $info->execute([$ma_lich]);
+                $bk = $info->fetch();
+                $ma_hv = $bk['ma_hoi_vien'] ?? null;
 
                 if ($ma_hv) {
                     // 2. Cập nhật trạng thái và lý do hủy
@@ -300,6 +312,13 @@ class TrainerController {
                        ->execute([$ma_hv]);
                     
                     $db->commit();
+
+                    // Gửi mail cho khách bị từ chối
+                    if ($bk && $bk['email'] && filter_var($bk['email'], FILTER_VALIDATE_EMAIL)) {
+                        $emailService = new EmailService();
+                        $emailService->sendPTBookingStatus($bk['email'], $bk['ho_ten'], $bk['ten_hlv'], $bk['ngay_gio_tap'], 'cancelled', 'HLV báo bận đột xuất');
+                    }
+
                     $msg = "Đã hủy/từ chối lịch hẹn và hoàn lại 1 buổi tập cho hội viên";
                 } else {
                     $db->rollBack();
@@ -473,14 +492,25 @@ class TrainerController {
             if ($action === 'accept') {
                 $stmt = $db->prepare("UPDATE LICH_DAT_PT SET trang_thai = 'confirmed' WHERE ma_lich = ? AND ma_hlv = ?");
                 $stmt->execute([$ma_lich, $ma_hlv]);
+
+                // Gửi mail cho khách xác nhận
+                $info = $db->prepare("SELECT u.email, u.ho_ten, l.ngay_gio_tap, u_hlv.ho_ten as ten_hlv FROM LICH_DAT_PT l JOIN HOI_VIEN hv ON l.ma_hoi_vien = hv.ma_hoi_vien JOIN NGUOI_DUNG u ON hv.ma_nguoi_dung = u.ma_nguoi_dung JOIN HUAN_LUYEN_VIEN hlv ON l.ma_hlv = hlv.ma_hlv JOIN NGUOI_DUNG u_hlv ON hlv.ma_nguoi_dung = u_hlv.ma_nguoi_dung WHERE l.ma_lich = ?");
+                $info->execute([$ma_lich]);
+                $bk = $info->fetch();
+                if ($bk && $bk['email'] && filter_var($bk['email'], FILTER_VALIDATE_EMAIL)) {
+                    $emailService = new EmailService();
+                    $emailService->sendPTBookingStatus($bk['email'], $bk['ho_ten'], $bk['ten_hlv'], $bk['ngay_gio_tap'], 'confirmed');
+                }
+
                 setFlash('success', 'Đã xác nhận nhận lịch dạy thành công!');
             } elseif ($action === 'reject') {
                 $db->beginTransaction();
                 try {
-                    // 1. Lấy mã hội viên của lịch này
-                    $stmtGet = $db->prepare("SELECT ma_hoi_vien FROM LICH_DAT_PT WHERE ma_lich = ? AND ma_hlv = ?");
-                    $stmtGet->execute([$ma_lich, $ma_hlv]);
-                    $ma_hv = $stmtGet->fetchColumn();
+                    // 1. Lấy thông tin lịch để gửi mail
+                    $info = $db->prepare("SELECT u.email, u.ho_ten, l.ngay_gio_tap, u_hlv.ho_ten as ten_hlv, l.ma_hoi_vien FROM LICH_DAT_PT l JOIN HOI_VIEN hv ON l.ma_hoi_vien = hv.ma_hoi_vien JOIN NGUOI_DUNG u ON hv.ma_nguoi_dung = u.ma_nguoi_dung JOIN HUAN_LUYEN_VIEN hlv ON l.ma_hlv = hlv.ma_hlv JOIN NGUOI_DUNG u_hlv ON hlv.ma_nguoi_dung = u_hlv.ma_nguoi_dung WHERE l.ma_lich = ?");
+                    $info->execute([$ma_lich]);
+                    $bk = $info->fetch();
+                    $ma_hv = $bk['ma_hoi_vien'] ?? null;
 
                     if ($ma_hv) {
                         // 2. Hủy lịch
@@ -492,6 +522,13 @@ class TrainerController {
                            ->execute([$ma_hv]);
 
                         $db->commit();
+
+                        // Gửi mail cho khách bị từ chối
+                        if ($bk && $bk['email'] && filter_var($bk['email'], FILTER_VALIDATE_EMAIL)) {
+                            $emailService = new EmailService();
+                            $emailService->sendPTBookingStatus($bk['email'], $bk['ho_ten'], $bk['ten_hlv'], $bk['ngay_gio_tap'], 'cancelled', 'HLV báo bận đột xuất');
+                        }
+
                         setFlash('warning', 'Đã từ chối lịch. Hệ thống đã hoàn lại buổi tập cho học viên.');
                     }
                 } catch (Exception $e) {

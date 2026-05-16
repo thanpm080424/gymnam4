@@ -492,6 +492,68 @@ class EmailService {
         </html>
         ";
     }
+
+    // 1. Email khi bị TỪ CHỐI hoặc THU HỒI tủ đồ
+    public function sendLockerCancellation($toEmail, $toName, $soTu, $lyDo, $type = 'revoke') {
+        $subject = ($type === 'revoke') ? "⚠️ Thông báo thu hồi Tủ đồ $soTu" : "❌ Từ chối yêu cầu thuê tủ";
+        $actionText = ($type === 'revoke') ? "thu hồi tủ đồ số <b>$soTu</b> của bạn" : "từ chối yêu cầu thuê tủ của bạn";
+        
+        $body = "
+        <div style='font-family: Arial, sans-serif; padding: 20px; background: #f4f4f5;'>
+            <h2 style='color: #ef4444;'>$subject</h2>
+            <p>Xin chào <b>$toName</b>,</p>
+            <p>Monkey Gym rất tiếc phải thông báo hệ thống đã $actionText.</p>
+            <p><b>Lý do / Ghi chú:</b> $lyDo</p>
+            <p>Vui lòng dọn dẹp đồ đạc cá nhân (nếu có) hoặc liên hệ quầy Lễ tân để được hỗ trợ. Cảm ơn bạn!</p>
+        </div>";
+        return $this->send($toEmail, $subject, $body);
+    }
+
+    // 2. Email khi ĐẶT LỊCH / HỦY LỊCH / XÁC NHẬN lịch PT
+    public function sendPTBookingStatus($toEmail, $toName, $ptName, $time, $status, $lyDo = '') {
+        $statusMap = [
+            'pending' => ['thông báo <b>ĐẶT LỊCH THÀNH CÔNG</b>', '#f59e0b', '⏳ Chờ HLV xác nhận'],
+            'confirmed' => ['được <b>HLV CHẤP NHẬN</b>', '#84cc16', '✅ Đã chốt lịch'],
+            'cancelled' => ['bị <b>HỦY</b>', '#ef4444', '❌ Đã hủy']
+        ];
+        
+        $action = $statusMap[$status][0];
+        $color = $statusMap[$status][1];
+        $badge = $statusMap[$status][2];
+        $subject = "Cập nhật lịch tập PT: $badge";
+
+        $body = "
+        <div style='font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 10px;'>
+            <h2 style='color: $color;'>$subject</h2>
+            <p>Xin chào <b>$toName</b>,</p>
+            <p>Lịch tập cá nhân của bạn với HLV <b>$ptName</b> vào lúc <b>" . date('H:i - d/m/Y', strtotime($time)) . "</b> đã $action.</p>";
+        
+        if ($lyDo) {
+            $body .= "<p style='color: #ef4444;'><b>Ghi chú/Lý do:</b> $lyDo</p>";
+        }
+        $body .= "<p>Chúc bạn một ngày tràn đầy năng lượng cùng Monkey Gym!</p></div>";
+        
+        return $this->send($toEmail, $subject, $body);
+    }
+
+    // 3. Email NHẮC NHỞ TRƯỚC 1 GIỜ & XIN ĐÁNH GIÁ
+    public function sendPTReminderOrReview($toEmail, $toName, $ptName, $time, $type = 'reminder') {
+        if ($type === 'reminder') {
+            $subject = "⏰ Nhắc nhở: Sắp đến giờ tập với HLV $ptName!";
+            $content = "Chỉ còn <b>chưa đầy 1 tiếng nữa</b> là đến buổi tập của bạn lúc <b>" . date('H:i', strtotime($time)) . "</b>. Bạn nhớ khởi động kỹ và mang theo nước uống nhé!";
+        } else {
+            $subject = "⭐️ Bạn cảm thấy buổi tập hôm nay thế nào?";
+            $content = "Buổi tập với HLV <b>$ptName</b> vừa kết thúc. Hãy dành 1 phút để đánh giá sao và giúp Monkey Gym nâng cao chất lượng dịch vụ nhé!";
+        }
+
+        $body = "
+        <div style='font-family: Arial, sans-serif; padding: 20px; background: #09090b; color: #fff; border-radius: 10px;'>
+            <h2 style='color: #84cc16;'>$subject</h2>
+            <p>Xin chào <b>$toName</b>,</p>
+            <p style='color: #ccc;'>$content</p>
+        </div>";
+        return $this->send($toEmail, $subject, $body);
+    }
 }
 
 /**

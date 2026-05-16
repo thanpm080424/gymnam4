@@ -6,33 +6,33 @@
     <title>Bảng Lương | Admin</title>
     <link rel="stylesheet" href="<?= ASSET_URL ?>/css/styles.css">
     <style>
-        .payroll-container { padding: 2rem; background: var(--bg-main); min-height: 100vh; color: var(--text-main); font-family: 'Inter', sans-serif; }
+        .payroll-container { padding: 2rem; background: var(--bg-primary); min-height: 100vh; color: var(--text-primary); font-family: 'Inter', sans-serif; }
         .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
-        .page-title { font-size: 2rem; font-weight: 800; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; }
+        .page-title { font-size: 2rem; font-weight: 800; color: var(--gold); text-transform: uppercase; letter-spacing: 1px; }
         
-        .btn-calc { background: var(--primary); color: #000; padding: 12px 24px; border-radius: 8px; font-weight: 700; text-transform: uppercase; text-decoration: none; border: none; cursor: pointer; transition: 0.3s; box-shadow: 0 0 15px rgba(132, 204, 22, 0.3); display: inline-flex; align-items: center; gap: 8px; }
-        .btn-calc:hover { background: #fff; box-shadow: 0 0 25px rgba(255,255,255,0.4); transform: translateY(-2px); }
+        .btn-calc { background: var(--gold); color: #fff; padding: 12px 24px; border-radius: 8px; font-weight: 700; text-transform: uppercase; text-decoration: none; border: none; cursor: pointer; transition: 0.3s; box-shadow: var(--shadow-md); display: inline-flex; align-items: center; gap: 8px; }
+        .btn-calc:hover { background: var(--gold-dark); box-shadow: var(--shadow-lg); transform: translateY(-2px); }
         
         /* Stats Box */
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem; }
-        .stat-card { background: var(--bg-card); padding: 1.5rem; border-radius: 16px; border: 1px solid var(--border-light); }
-        .stat-label { color: var(--text-muted); font-size: 0.9rem; font-weight: 600; text-transform: uppercase; margin-bottom: 10px; }
-        .stat-value { font-size: 2.2rem; font-weight: 800; color: #fff; }
+        .stat-card { background: var(--bg-card); padding: 1.5rem; border-radius: 16px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+        .stat-label { color: var(--text-secondary); font-size: 0.9rem; font-weight: 600; text-transform: uppercase; margin-bottom: 10px; }
+        .stat-value { font-size: 2.2rem; font-weight: 800; color: var(--text-primary); }
         
         /* Table */
-        .table-box { background: var(--bg-card); padding: 2rem; border-radius: 16px; border: 1px solid var(--border-light); overflow-x: auto; }
+        .table-box { background: var(--bg-card); padding: 2rem; border-radius: 16px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); overflow-x: auto; }
         .payroll-table { width: 100%; border-collapse: collapse; }
-        .payroll-table th { text-align: left; padding: 15px; background: rgba(255,255,255,0.03); color: var(--text-muted); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
-        .payroll-table td { padding: 15px; border-bottom: 1px solid var(--border-light); font-size: 0.95rem; }
+        .payroll-table th { text-align: left; padding: 15px; background: var(--bg-primary); color: var(--text-secondary); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        .payroll-table td { padding: 15px; border-bottom: 1px solid var(--border-light); font-size: 0.95rem; color: var(--text-primary); }
         
-        .amount { font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700; }
-        .total-amount { color: var(--primary); font-size: 1.2rem; }
+        .amount { font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
+        .total-amount { color: var(--gold); font-size: 1.2rem; }
         
         .status-badge { padding: 4px 12px; border-radius: 50px; font-size: 0.75rem; font-weight: bold; }
-        .status-unpaid { background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
-        .status-paid { background: rgba(132,204,22,0.1); color: var(--primary); border: 1px solid rgba(132,204,22,0.3); }
-
-        .alert { padding: 15px; background: rgba(132,204,22,0.1); color: var(--primary); border: 1px solid rgba(132,204,22,0.3); border-radius: 8px; margin-bottom: 20px; font-weight: bold; }
+        .status-unpaid { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(220, 38, 38, 0.2); }
+        .status-paid { background: var(--success-bg); color: var(--success); border: 1px solid rgba(22, 163, 74, 0.2); }
+ 
+        .alert { padding: 15px; background: var(--success-bg); color: var(--success); border: 1px solid var(--success); border-radius: 8px; margin-bottom: 20px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -44,7 +44,7 @@
         <div class="page-header">
             <div>
                 <h1 class="page-title">Bảng Lương & Hoa Hồng</h1>
-                <p style="color: #a1a1aa;">Kỳ lương: Tháng <?= htmlspecialchars($month) ?></p>
+                <p style="color: var(--text-muted);">Kỳ lương: Tháng <?= htmlspecialchars($month) ?></p>
             </div>
             <a href="<?= SITE_URL ?>/admin/payroll/calculate" class="btn-calc" onclick="return confirm('Hệ thống sẽ quét lịch dạy và tính toán lại toàn bộ lương tháng này. Chắc chắn tiếp tục?')">
                 ⚙️ CHỐT LƯƠNG THÁNG NÀY
@@ -70,11 +70,11 @@
             </div>
             <div class="stat-card">
                 <div class="stat-label">Tổng Buổi Đã Dạy</div>
-                <div class="stat-value"><?= $tongBuoi ?> <span style="font-size: 1rem; color: #a1a1aa;">buổi</span></div>
+                <div class="stat-value"><?= $tongBuoi ?> <span style="font-size: 1rem; color: var(--text-muted);">buổi</span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Nhân sự nhận lương</div>
-                <div class="stat-value"><?= count($payrolls) ?> <span style="font-size: 1rem; color: #a1a1aa;">người</span></div>
+                <div class="stat-value"><?= count($payrolls) ?> <span style="font-size: 1rem; color: var(--text-muted);">người</span></div>
             </div>
         </div>
 
@@ -96,10 +96,10 @@
                     <?php if(!empty($payrolls)): ?>
                         <?php foreach($payrolls as $p): ?>
                             <tr>
-                                <td style="color: #a1a1aa;">#<?= $p['ma_hlv'] ?></td>
-                                <td style="font-weight: 700;"><?= htmlspecialchars($p['ho_ten'] ?? $p['ten_dang_nhap']) ?></td>
+                                <td style="color: var(--text-muted);">#<?= $p['ma_hlv'] ?></td>
+                                <td style="font-weight: 700; color: var(--text-primary);"><?= htmlspecialchars($p['ho_ten'] ?? $p['ten_dang_nhap']) ?></td>
                                 <td class="amount"><?= number_format($p['luong_cung']) ?>đ</td>
-                                <td><strong style="color: #fff;"><?= $p['so_buoi_day'] ?></strong> buổi</td>
+                                <td><strong style="color: var(--text-primary);"><?= $p['so_buoi_day'] ?></strong> buổi</td>
                                 <td class="amount"><?= number_format($p['thuong_hoa_hong']) ?>đ</td>
                                 <td class="amount total-amount"><?= number_format($p['tong_luong']) ?>đ</td>
                                 <td>

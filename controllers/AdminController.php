@@ -822,9 +822,24 @@ class AdminController {
     public function rejectLocker() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             require_once __DIR__ . '/../database/config.php';
+            require_once __DIR__ . '/../includes/EmailService.php';
             $db = Database::getConnection();
+            
+            // Lấy thông tin để gửi mail TRƯỚC KHI xử lý
+            $info = $db->prepare("SELECT u.email, u.ho_ten, u.ten_dang_nhap FROM YEU_CAU_THUE_TU yc JOIN HOI_VIEN hv ON yc.ma_hoi_vien = hv.ma_hoi_vien JOIN NGUOI_DUNG u ON hv.ma_nguoi_dung = u.ma_nguoi_dung WHERE yc.ma_yc = ?");
+            $info->execute([$_POST['ma_yc']]);
+            $user = $info->fetch();
+
             $db->prepare("UPDATE YEU_CAU_THUE_TU SET trang_thai='rejected' WHERE ma_yc=?")
                ->execute([$_POST['ma_yc']]);
+
+            // Gửi mail
+            if ($user && $user['email'] && filter_var($user['email'], FILTER_VALIDATE_EMAIL)) {
+                $emailService = new EmailService();
+                $name = $user['ho_ten'] ?: $user['ten_dang_nhap'];
+                $emailService->sendLockerCancellation($user['email'], $name, 'Chưa cấp', 'Yêu cầu của bạn không hợp lệ hoặc hết tủ phù hợp', 'reject');
+            }
+
             header("Location: " . SITE_URL . "/admin/lockers?msg=" . urlencode("Đã từ chối yêu cầu."));
         }
     }
@@ -832,7 +847,14 @@ class AdminController {
     public function revokeLocker() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             require_once __DIR__ . '/../database/config.php';
+            require_once __DIR__ . '/../includes/EmailService.php';
             $db = Database::getConnection();
+            
+            // Lấy thông tin để gửi mail TRƯỚC KHI xóa
+            $info = $db->prepare("SELECT u.email, u.ho_ten, u.ten_dang_nhap, t.so_tu FROM YEU_CAU_THUE_TU yc JOIN HOI_VIEN hv ON yc.ma_hoi_vien = hv.ma_hoi_vien JOIN NGUOI_DUNG u ON hv.ma_nguoi_dung = u.ma_nguoi_dung LEFT JOIN TU_DO t ON yc.ma_tu = t.ma_tu WHERE yc.ma_yc = ?");
+            $info->execute([$_POST['ma_yc']]);
+            $user = $info->fetch();
+
             $db->beginTransaction();
             $stmtY = $db->prepare("SELECT ma_tu FROM YEU_CAU_THUE_TU WHERE ma_yc = ?");
             $stmtY->execute([$_POST['ma_yc']]);
@@ -840,6 +862,15 @@ class AdminController {
             $db->prepare("UPDATE YEU_CAU_THUE_TU SET trang_thai='cancelled' WHERE ma_yc=?")->execute([$_POST['ma_yc']]);
             if ($maTu) $db->prepare("UPDATE TU_DO SET trang_thai='trong' WHERE ma_tu=?")->execute([$maTu]);
             $db->commit();
+
+            // Gửi mail
+            if ($user && $user['email'] && filter_var($user['email'], FILTER_VALIDATE_EMAIL)) {
+                $emailService = new EmailService();
+                $name = $user['ho_ten'] ?: $user['ten_dang_nhap'];
+                $soTu = $user['so_tu'] ?: 'Chưa cấp';
+                $emailService->sendLockerCancellation($user['email'], $name, $soTu, 'Hết hạn hoặc vi phạm quy định', 'revoke');
+            }
+
             header("Location: " . SITE_URL . "/admin/lockers?msg=" . urlencode("Đã thu hồi tủ."));
         }
     }
@@ -1866,20 +1897,16 @@ class AdminController {
             $trainers = $db->query("SELECT * FROM HUAN_LUYEN_VIEN")->fetchAll();
             
             foreach ($trainers as $t) {
-                // 1. KIỂM TRA: HLV này đã được thanh toán lương tháng này chưa?
-                $stmtCheck = $db->prepare("SELECT ma_luong, trang_thai FROM BANG_LUONG WHERE ma_hlv = ? AND thang_nam = ? ORDER BY ma_luong DESC LIMIT 1");
-                $stmtCheck->execute([$t['ma_hlv'], $month]);
-                $existing = $stmtCheck->fetch();
-
                 // Nếu ĐÃ THANH TOÁN -> Bỏ qua, tuyệt đối không tính lại để tránh nhân đôi lương cứng
-                if ($existing && $existing['trang_thai'] === 'da_thanh_toan') {
+                $stmtPaid = $db->prepare("SELECT COUNT(*) FROM BANG_LUONG WHERE ma_hlv = ? AND thang_nam = ? AND trang_thai = 'da_thanh_toan'");
+                $stmtPaid->execute([$t['ma_hlv'], $month]);
+                if ($stmtPaid->fetchColumn() > 0) {
                     continue; 
                 }
 
-                // Nếu có bản nháp (CHƯA THANH TOÁN) -> Xóa đi để tính lại bản mới (Cập nhật số buổi mới nhất)
-                if ($existing && $existing['trang_thai'] === 'chua_thanh_toan') {
-                    $db->prepare("DELETE FROM BANG_LUONG WHERE ma_luong = ?")->execute([$existing['ma_luong']]);
-                }
+                // Xóa tất cả bản nháp (CHƯA THANH TOÁN) cũ để tính lại từ đầu
+                $db->prepare("DELETE FROM BANG_LUONG WHERE ma_hlv = ? AND thang_nam = ? AND trang_thai = 'chua_thanh_toan'")
+                   ->execute([$t['ma_hlv'], $month]);
 
                 // 2. ĐẾM SỐ BUỔI DẠY (Lớp Nhóm + PT)
                 $stmtCountGroup = $db->prepare("SELECT COUNT(*) as tong_buoi FROM LICH_HOC_NHOM WHERE ma_hlv = ? AND DATE_FORMAT(ngay_hoc, '%Y-%m') = ?");
